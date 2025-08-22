@@ -89,6 +89,7 @@ const sendBookingConfirmationEmail = inngest.createFunction(
                 console.log('Booking not found for email:', bookingId);
                 return;
             }
+            
 
             // ✅ Complete email body template
             const emailBody = `
