@@ -184,6 +184,7 @@ const sendBookingConfirmationEmail = inngest.createFunction(
                 </div>
             </div>
             `;
+            console.log(booking.user.email, booking.show.movie.title, booking.bookedSeats);
 
             await sendEmail({
                 to: booking.user.email,
