@@ -3,8 +3,10 @@ import { dummyShowsData } from '../assets/assets'
 import MovieCard from '../components/MovieCard'
 import BlurCircle from '../components/BlurCircle'
 import { Heart, Star, Award, Trophy, Crown, Sparkles } from 'lucide-react'
+import { useAppContext } from '../context/AppContext'
 
 const Favorite = () => {
+  const {favoriteMovies, shows} = useAppContext()
   const [isVisible, setIsVisible] = useState(false)
   const [topRatedMovies, setTopRatedMovies] = useState([])
 
@@ -17,7 +19,7 @@ const Favorite = () => {
 
   useEffect(() => {
     // Sắp xếp phim theo vote_average và lấy top 10
-    const sortedMovies = [...dummyShowsData]
+    const sortedMovies = [...shows]
       .sort((a, b) => {
         const voteA = parseFloat(a.vote_average) || 0
         const voteB = parseFloat(b.vote_average) || 0
@@ -26,7 +28,6 @@ const Favorite = () => {
       .slice(0, 10)
     
     setTopRatedMovies(sortedMovies)
-    console.log('Top 10 rated movies:', sortedMovies.map(m => ({ title: m.title, vote: m.vote_average })))
   }, [])
 
   return topRatedMovies.length > 0 ? (

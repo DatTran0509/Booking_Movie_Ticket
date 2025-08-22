@@ -3,8 +3,9 @@ import { dummyShowsData } from '../assets/assets'
 import MovieCard from '../components/MovieCard'
 import BlurCircle from '../components/BlurCircle'
 import { Film, Calendar, Clock, Star, Filter, Search } from 'lucide-react'
-
+import { useAppContext } from '../context/AppContext'
 const Movies = () => {
+  const {shows} = useAppContext()
   const [isVisible, setIsVisible] = useState(false)
   const [animationDelay, setAnimationDelay] = useState(0)
 
@@ -15,7 +16,7 @@ const Movies = () => {
     return () => clearTimeout(timer)
   }, [])
 
-  return dummyShowsData.length > 0 ? (
+  return shows.length > 0 ? (
     <div className='relative my-40 mb-60 px-6 md:px-16 lg:px-40 xl:px-44 overflow-hidden min-h-[80vh]'> 
       {/* Enhanced Background Effects */}
       <div className='absolute inset-0 bg-gradient-to-br from-transparent via-primary/5 to-transparent'></div>
@@ -87,7 +88,7 @@ const Movies = () => {
       }`}>
         {/* CSS Grid Layout - 4 columns per row */}
         <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8 justify-items-center'>
-          {dummyShowsData.map((movie, index) => (
+          {shows.map((movie, index) => (
             <div
               key={movie._id}
               className={`w-full max-w-[280px] transition-all duration-700 ${

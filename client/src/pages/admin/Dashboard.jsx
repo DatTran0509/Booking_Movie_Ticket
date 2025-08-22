@@ -5,8 +5,10 @@ import Loading from '../../components/Loading'
 import Title from '../../components/admin/Title'
 import { dateFormat } from '../../lib/dateFormat'
 import BlurCircle from '../../components/BlurCircle'
-
+import { useAppContext } from '../../context/AppContext'
+import toast from 'react-hot-toast'
 const Dashboard = () => {
+  const {axios, getToken, user, image_base_url} = useAppContext()
   const currency = import.meta.env.VITE_CURRENCY
   const [bookings, setBookings] = useState([])
 
@@ -27,13 +29,27 @@ const Dashboard = () => {
   ]
 
   const fetchDashboardData = async () => {
-    setDashboardData(dummyDashboardData)
-    setLoading(false)
+    try {
+      const {data} = await axios.get('/api/admin/dashboard', {
+        headers: { Authorization: `Bearer ${await getToken()}`}
+      })
+
+      if (data.success) {
+        setDashboardData(data.dashboardData)
+        setLoading(false)
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Error fetching dashboard data', error)
+    }
   }
 
   useEffect(() => {
     fetchDashboardData()
   }, [])
+
+  console.log('Dashboard Data:', dashboardData)
 
   return !loading ? (
     <div className="min-h-screen bg-black text-white p-6 relative">
@@ -90,7 +106,7 @@ const Dashboard = () => {
               {/* Movie Poster */}
               <div className="relative overflow-hidden">
                 <img 
-                  src={show.movie.poster_path} 
+                  src={image_base_url + show.movie.poster_path} 
                   alt={show.movie.title}
                   className="w-full h-60 object-cover group-hover:scale-110 transition-transform duration-500"
                 />
@@ -134,11 +150,34 @@ const Dashboard = () => {
 
                 {/* Additional Info */}
                 <div className="mt-3 pt-3 border-t border-gray-700/30">
-                  <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>Duration: {show.movie.runtime || '120'} min</span>
-                    <span className="bg-primary/20 text-primary px-2 py-1 rounded-full">
-                      {show.movie.genre_ids?.length || 0} Genres
-                    </span>
+                  <div className="space-y-2">
+                    {/* Duration */}
+                    <div className="text-xs text-gray-400">
+                      Duration: {show.movie.runtime || '120'} min
+                    </div>
+                    
+                    {/* Genres */}
+                    <div className="flex flex-wrap gap-1">
+                      {show.movie.genres?.length > 0 ? (
+                        show.movie.genres.slice(0, 3).map((genre, genreIndex) => (
+                          <span 
+                            key={genreIndex}
+                            className="bg-primary/20 text-primary px-2 py-1 rounded-full text-xs"
+                          >
+                            {genre.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="bg-gray-700/50 text-gray-400 px-2 py-1 rounded-full text-xs">
+                          No Genres
+                        </span>
+                      )}
+                      {show.movie.genres?.length > 3 && (
+                        <span className="bg-gray-700/50 text-gray-400 px-2 py-1 rounded-full text-xs">
+                          +{show.movie.genres.length - 3}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

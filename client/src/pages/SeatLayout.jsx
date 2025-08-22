@@ -7,40 +7,140 @@ import isoTimeFormat from '../lib/isoTimeFormat'
 import BlurCircle from '../components/BlurCircle'
 import toast from 'react-hot-toast'
 import timeFormat from '../lib/timeFormat'
+import { useAppContext } from '../context/AppContext'
+
+// ✅ Thêm custom CSS animation ở đầu component
+const customStyles = `
+  @keyframes syncPulse {
+    0%, 100% { 
+      opacity: 1; 
+      transform: scale(1.1);
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+    }
+    50% { 
+      opacity: 0.6; 
+      transform: scale(1.05);
+      box-shadow: 0 0 30px rgba(34, 197, 94, 0.8);
+    }
+  }
+  
+  @keyframes syncGlow {
+    0%, 100% { 
+      opacity: 0.4;
+      transform: scale(1);
+    }
+    50% { 
+      opacity: 0.8;
+      transform: scale(1.1);
+    }
+  }
+  
+  .sync-pulse {
+    animation: syncPulse 2s ease-in-out infinite;
+  }
+  
+  .sync-glow {
+    animation: syncGlow 2s ease-in-out infinite;
+  }
+`
 
 const SeatLayout = () => {
+  const {axios, getToken, user, image_base_url} = useAppContext()
   const { id, date } = useParams()
   const navigate = useNavigate()
-  
+ 
   const [selectedSeats, setSelectedSeats] = useState([])
   const [selectedTime, setSelectedTime] = useState(null)
   const [show, setShow] = useState(null)
   const [isVisible, setIsVisible] = useState(false)
+  const [occupiedSeats, setOccupiedSeats] = useState([])
+  const [showPrice, setShowPrice] = useState(0)
 
   // Seat configuration với pricing tiers
   const seatRows = [
-    { row: 'A', count: 9, type: 'front', price: 120, label: 'Front Premium' },
-    { row: 'B', count: 9, type: 'front', price: 120, label: 'Front Premium' },
-    { row: 'C', count: 18, type: 'middle', price: 150, label: 'Middle VIP' },
-    { row: 'D', count: 18, type: 'middle', price: 150, label: 'Middle VIP' },
-    { row: 'E', count: 18, type: 'middle', price: 150, label: 'Middle VIP' },
-    { row: 'F', count: 18, type: 'middle', price: 150, label: 'Middle VIP' },
-    { row: 'G', count: 18, type: 'middle', price: 150, label: 'Middle VIP' },
-    { row: 'H', count: 18, type: 'back', price: 100, label: 'Back Standard' },
-    { row: 'I', count: 18, type: 'back', price: 100, label: 'Back Standard' },
-    { row: 'J', count: 18, type: 'back', price: 100, label: 'Back Standard' }
+    { row: 'A', count: 9, type: 'front', label: 'Front Premium' },
+    { row: 'B', count: 9, type: 'front', label: 'Front Premium' },
+    { row: 'C', count: 18, type: 'middle', label: 'Middle VIP' },
+    { row: 'D', count: 18, type: 'middle', label: 'Middle VIP' },
+    { row: 'E', count: 18, type: 'middle', label: 'Middle VIP' },
+    { row: 'F', count: 18, type: 'middle', label: 'Middle VIP' },
+    { row: 'G', count: 18, type: 'middle', label: 'Middle VIP' },
+    { row: 'H', count: 18, type: 'back', label: 'Back Standard' },
+    { row: 'I', count: 18, type: 'back', label: 'Back Standard' },
+    { row: 'J', count: 18, type: 'back', label: 'Back Standard' }
   ]
 
   // Mock occupied seats
-  const occupiedSeats = ['A5', 'A6', 'B4', 'C5', 'C6', 'C12', 'C13', 'D4', 'D5', 'D15', 'E8', 'E16', 'F3', 'F4', 'H7', 'H14', 'I5', 'I17', 'J8', 'J12']
-
   const getShow = async () => {
-    const show = dummyShowsData.find(show => show._id === id)
-    if (show) {
-      setShow({
-        movie: show,
-        dateTime: dummyDateTimeData
+    try {
+      const {data} = await axios.get(`/api/show/${id}`)
+      if (data.success) {
+        setShow(data)
+        // ✅ REMOVE auto time selection - let customer choose
+        // if (!selectedTime && data.dateTime[date]?.length > 0) {
+        //   setSelectedTime(data.dateTime[date][0])
+        // }
+      }
+
+    } catch (error) {
+      console.log(error)
+    }
+  }
+  const getOccupiedSeats = async () => {
+    try {
+      const {data} = await axios.get(`/api/booking/seats/${selectedTime.showId}`)
+      console.log('Occupied Seats Data:', data)
+      if (data.success) {
+        setOccupiedSeats(data.occupiedSeats)
+      }else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      console.log(error)
+    }
+  }
+  const getShowPrice = async () => {
+    try {
+      if (!selectedTime?.showId) return;
+      
+      const {data} = await axios.get(`/api/show/showprice/${selectedTime.showId}`, {
+        headers: { Authorization: `Bearer ${await getToken()}` }
       })
+      
+      console.log('Show Price Data:', data)
+      if (data.success) {
+        setShowPrice(data.showPrice)
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      console.error('Error fetching show price:', error)
+      toast.error('Failed to fetch show price')
+    }
+  }
+  
+  const bookTickets = async () => {
+    try {
+      if(!user) return toast.error('Please login to book tickets')
+      const {data} = await axios.post('/api/booking/create', {showId: selectedTime.showId, selectedSeats: selectedSeats}, {
+        headers: { Authorization: `Bearer ${await getToken()}` }
+      })
+      if (data.success) {
+        // toast.success('Tickets booked successfully!', {
+        //   icon: '🎟️',
+        //   style: {
+        //     background: '#1a1a1a',
+        //     color: '#fff',
+        //     border: '1px solid #10b981'
+        //   }
+        // })
+        window.location.href = data.url
+        
+      }else{
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error(error.message)
     }
   }
 
@@ -51,11 +151,29 @@ const SeatLayout = () => {
     }, 300)
     return () => clearTimeout(timer)
   }, [id])
+  // ✅ Update useEffect to fetch price when time selected
+  useEffect(() => {
+    if (selectedTime) {
+      getOccupiedSeats()
+      getShowPrice() // ✅ Fetch price when time is selected
+    }
+  }, [selectedTime])
 
   const handleSeatClick = (seatId) => {
     if (!selectedTime) {
       return toast.error('Please select a time first', {
         icon: '⏰',
+        style: {
+          background: '#1a1a1a',
+          color: '#fff',
+          border: '1px solid #333'
+        }
+      })
+    }
+
+    if (showPrice === 0) {
+      return toast.error('Loading seat price, please wait...', {
+        icon: '💰',
         style: {
           background: '#1a1a1a',
           color: '#fff',
@@ -102,7 +220,7 @@ const SeatLayout = () => {
         }
       })
     } else {
-      toast.success(`Seat ${seatId} selected`, {
+      toast.success(`Seat ${seatId} selected • $${showPrice}`, {
         icon: '✅',
         style: {
           background: '#1a1a1a',
@@ -132,16 +250,17 @@ const SeatLayout = () => {
   }
 
   const getSeatPrice = (row) => {
-    const seatRow = seatRows.find(r => r.row === row)
-    return seatRow?.price || 150
+    return showPrice || 0 // Tất cả seats cùng giá showPrice
   }
 
+  // ✅ Update getSeatStyles - remove animate-pulse, sẽ dùng custom class
   const getSeatStyles = (status, rowType) => {
     const baseStyles = 'w-8 h-8 rounded-lg border-2 text-xs font-bold transition-all duration-300 transform relative overflow-hidden'
     
     switch (status) {
       case 'selected':
-        return `${baseStyles} bg-gradient-to-br from-primary to-primary-dull text-white border-primary shadow-lg shadow-primary/50 scale-110 animate-pulse`
+        // ✅ Thêm sync-pulse class thay vì animate-pulse
+        return `${baseStyles} bg-gradient-to-br from-green-500 to-green-600 text-white border-green-400 shadow-lg shadow-green-500/50 sync-pulse`
       case 'occupied':
         return `${baseStyles} bg-gradient-to-br from-red-600 to-red-800 text-white border-red-500 cursor-not-allowed opacity-80`
       case 'available':
@@ -155,8 +274,9 @@ const SeatLayout = () => {
     }
   }
 
+  // ✅ Update renderSeatRow với sync animation
   const renderSeatRow = (rowData) => {
-    const { row, count, type, price } = rowData
+    const { row, count, type } = rowData // Remove price from destructuring
     const seats = []
     
     for (let i = 1; i <= count; i++) {
@@ -184,21 +304,25 @@ const SeatLayout = () => {
         <div key={seatId} className="relative group">
           <button
             onClick={() => handleSeatClick(seatId)}
-            disabled={status === 'occupied'}
+            disabled={status === 'occupied' || showPrice === 0} // ✅ Disable until price loaded
             className={getSeatStyles(status, type)}
           >
             {/* Seat number */}
             <span className="relative z-10">{i}</span>
             
-            {/* Glow effect for selected seats */}
+            {/* ✅ Sync glow effects */}
             {status === 'selected' && (
-              <div className="absolute inset-0 bg-primary/30 rounded-lg blur-sm animate-pulse"></div>
+              <>
+                <div className="absolute inset-0 bg-green-500/40 rounded-lg blur-sm sync-glow"></div>
+                <div className="absolute -inset-1 bg-green-400/20 rounded-lg blur-md sync-glow"></div>
+                <div className="absolute -inset-2 bg-green-300/10 rounded-lg blur-xl sync-glow"></div>
+              </>
             )}
             
-            {/* Hover tooltip */}
+            {/* ✅ Updated tooltip với showPrice */}
             {status !== 'occupied' && (
               <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black/90 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none whitespace-nowrap z-20">
-                ${price} • {seatId}
+                ${showPrice > 0 ? showPrice : '...'} • {seatId}
               </div>
             )}
           </button>
@@ -218,11 +342,7 @@ const SeatLayout = () => {
   }
 
   const calculateTotal = () => {
-    return selectedSeats.reduce((total, seatId) => {
-      const row = seatId.charAt(0)
-      const price = getSeatPrice(row)
-      return total + price
-    }, 0)
+    return selectedSeats.length * showPrice
   }
 
   const getSectionColor = (type) => {
@@ -236,6 +356,9 @@ const SeatLayout = () => {
 
   return show ? (
     <div className="min-h-screen bg-black relative overflow-hidden">
+      {/* ✅ Inject custom styles */}
+      <style>{customStyles}</style>
+      
       {/* Enhanced Background Effects */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5"></div>
       <BlurCircle top="-100px" left="-100px" />
@@ -302,7 +425,7 @@ const SeatLayout = () => {
             <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
               <div className="flex items-start gap-4">
                 <img 
-                  src={show.movie.poster_path} 
+                  src={image_base_url + show.movie.poster_path} 
                   alt={show.movie.title}
                   className="w-16 h-24 rounded-lg object-cover border border-white/20"
                 />
@@ -327,18 +450,21 @@ const SeatLayout = () => {
             <div className="mt-6 space-y-3">
               <h5 className="text-white font-semibold mb-3">Seat Pricing</h5>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-yellow-500">Front Premium</span>
-                  <span className="text-white font-bold">$120</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-primary">Middle VIP</span>
-                  <span className="text-white font-bold">$150</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-green-500">Back Standard</span>
-                  <span className="text-white font-bold">$100</span>
-                </div>
+                {selectedTime ? (
+                  <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
+                    <div className="text-primary text-2xl font-bold mb-1">
+                      ${showPrice}
+                    </div>
+                    <div className="text-gray-400 text-sm">
+                      All Seats • Same Price
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <span className="text-gray-400 text-sm">Please Choose Time</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -372,7 +498,7 @@ const SeatLayout = () => {
             <div className="mb-12">
               <div className="text-center mb-6">
                 <span className="text-yellow-500 text-lg font-bold px-4 py-2 bg-yellow-500/10 rounded-full border border-yellow-500/20">
-                  Front Premium • $120
+                  Front Premium • ${showPrice > 0 ? showPrice : '...'}
                 </span>
               </div>
               {seatRows.filter(row => row.type === 'front').map(renderSeatRow)}
@@ -382,7 +508,7 @@ const SeatLayout = () => {
             <div className="mb-12">
               <div className="text-center mb-6">
                 <span className="text-primary text-lg font-bold px-4 py-2 bg-primary/10 rounded-full border border-primary/20">
-                  Middle VIP • $150
+                  Middle VIP • ${showPrice > 0 ? showPrice : '...'}
                 </span>
               </div>
               {seatRows.filter(row => row.type === 'middle').map(renderSeatRow)}
@@ -392,21 +518,22 @@ const SeatLayout = () => {
             <div className="mb-12">
               <div className="text-center mb-6">
                 <span className="text-green-500 text-lg font-bold px-4 py-2 bg-green-500/10 rounded-full border border-green-500/20">
-                  Back Standard • $100
+                  Back Standard • ${showPrice > 0 ? showPrice : '...'}
                 </span>
               </div>
               {seatRows.filter(row => row.type === 'back').map(renderSeatRow)}
             </div>
           </div>
 
-          {/* Enhanced Legend */}
+          {/* Enhanced Legend với sync animation */}
           <div className="flex justify-center gap-12 mb-12">
             <div className="flex items-center gap-3">
               <div className="w-6 h-6 bg-transparent border-2 border-gray-600 rounded-lg"></div>
               <span className="text-gray-400 font-medium">Available</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-gradient-to-br from-primary to-primary-dull rounded-lg shadow-lg shadow-primary/30"></div>
+              {/* ✅ Sync animation cho legend */}
+              <div className="w-6 h-6 bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg shadow-green-500/30 sync-pulse"></div>
               <span className="text-gray-400 font-medium">Selected</span>
             </div>
             <div className="flex items-center gap-3">
@@ -440,7 +567,8 @@ const SeatLayout = () => {
                 <span className="text-gray-400 font-medium">Selected Seats:</span>
                 <div className="flex gap-2 flex-wrap">
                   {selectedSeats.map(seat => (
-                    <span key={seat} className="px-3 py-1 bg-primary/20 text-primary rounded-lg text-sm font-bold border border-primary/30">
+                    /* ✅ Sync animation cho selected seat tags */
+                    <span key={seat} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm font-bold border border-green-500/30 sync-pulse">
                       {seat}
                     </span>
                   ))}
@@ -449,7 +577,7 @@ const SeatLayout = () => {
 
               <button 
                 disabled={!selectedTime || selectedSeats.length === 0}
-                onClick={() => navigate('/my-bookings')}
+                onClick={bookTickets}
                 className="w-full bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-bold py-6 rounded-2xl transition-all duration-300 hover:scale-105 disabled:hover:scale-100 shadow-lg shadow-primary/30 hover:shadow-2xl hover:shadow-primary/50 disabled:shadow-none flex items-center justify-center gap-3 text-lg relative overflow-hidden group"
               >
                 <span className="relative z-10">Proceed to Checkout</span>

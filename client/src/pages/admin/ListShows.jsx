@@ -4,83 +4,33 @@ import Title from '../../components/admin/Title'
 import { dateFormat } from '../../lib/dateFormat'
 import Loading from '../../components/Loading'
 import BlurCircle from '../../components/BlurCircle'
- import { Calendar, Clock, DollarSign, Users, Eye } from 'lucide-react'
-
+import { Calendar, Clock, DollarSign, Users, Eye } from 'lucide-react'
+import { useAppContext } from '../../context/AppContext'
 const ListShows = () => {
+    const {axios, getToken, user, image_base_url} = useAppContext()
+    
+
     const currency = import.meta.env.VITE_CURRENCY || '$'
     const [shows, setShows] = useState([])
     const [loading, setLoading] = useState(true)
 
     const getAllShows = async () => {
         try {
-            const mockShows = [
-                {
-                    _id: '1',
-                    movie: dummyShowsData[0],
-                    showDateTime: "2025-05-12T19:00:00.000Z",
-                    showPrice: 30,
-                    bookedSeats: ['A1', 'A2', 'B3', 'C4', 'D5'],
-                    occupiedSeats: {
-                        "A1": true,
-                        "A2": true,
-                        "B3": true,
-                        "C4": true,
-                        "D5": true
-                    }
-                },
-                {
-                    _id: '2',
-                    movie: dummyShowsData[1] || dummyShowsData[0],
-                    showDateTime: "2025-05-12T19:00:00.000Z",
-                    showPrice: 30,
-                    bookedSeats: ['A1', 'A2', 'B3'],
-                    occupiedSeats: {
-                        "A1": true,
-                        "A2": true,
-                        "B3": true
-                    }
-                },
-                {
-                    _id: '3',
-                    movie: dummyShowsData[2] || dummyShowsData[0],
-                    showDateTime: "2025-05-12T19:00:00.000Z",
-                    showPrice: 30,
-                    bookedSeats: ['A1', 'A2', 'B3', 'C4', 'D5', 'E6'],
-                    occupiedSeats: {
-                        "A1": true,
-                        "A2": true,
-                        "B3": true,
-                        "C4": true,
-                        "D5": true,
-                        "E6": true
-                    }
-                },
-                {
-                    _id: '4',
-                    movie: dummyShowsData[3] || dummyShowsData[0],
-                    showDateTime: "2025-05-12T19:00:00.000Z",
-                    showPrice: 30,
-                    bookedSeats: ['A1', 'A2'],
-                    occupiedSeats: {
-                        "A1": true,
-                        "A2": true
-                    }
-                }
-            ]
-            
-            setTimeout(() => {
-                setShows(mockShows)
-                setLoading(false)
-            }, 1000)
+            const {data} = await axios.get('/api/admin/all-shows', {
+                headers: { Authorization: `Bearer ${await getToken()}` }
+            })
+            setShows(data.shows)
+            setLoading(false)
         } catch (error) {
             console.error(error)
-            setLoading(false)
         }
     }
 
     useEffect(() => {
-        getAllShows()
-    }, [])
+        if(user) {
+            getAllShows()
+        }
+    }, [user])
 
     const getTotalBookings = (show) => {
         return show.bookedSeats ? show.bookedSeats.length : 0
@@ -138,7 +88,7 @@ const ListShows = () => {
                             <div className="col-span-5 flex items-center gap-3">
                                 <div className="relative flex-shrink-0">
                                     <img 
-                                        src={show.movie.poster_path} 
+                                        src={image_base_url+show.movie.poster_path} 
                                         alt={show.movie.title}
                                         className="w-14 h-20 object-cover rounded-lg border border-gray-600"
                                     />

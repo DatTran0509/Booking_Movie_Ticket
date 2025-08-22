@@ -6,22 +6,38 @@ import Title from '../../components/admin/Title'
 import BlurCircle from '../../components/BlurCircle'
 import { dateFormat } from '../../lib/dateFormat'
 import { User, Film, Calendar, MapPin, DollarSign, Eye, CheckCircle, Clock, CreditCard } from 'lucide-react'
-
+import { useAppContext } from '../../context/AppContext'
 const ListBookings = () => {
+    const {axios, getToken, user, image_base_url} = useAppContext()
+    
     const currency = import.meta.env.VITE_CURRENCY || '$'
     const [bookings, setBookings] = useState([])
     const [loading, setLoading] = useState(true)
 
     const getAllBooking = async () => {
-        setTimeout(() => {
-            setBookings(dummyBookingData)
-            setLoading(false)
-        }, 1000)
+        try {
+            const {data} = await axios.get('/api/admin/all-bookings', {
+                headers: { Authorization: `Bearer ${await getToken()}` }
+            })
+            console.log(data)
+            if (data.success) {
+                setBookings(data.bookings) 
+                setLoading(false)
+            }
+            else {
+                toast.error(data.message)
+            }
+        } catch (error) {
+            console.error(error)
+        }
+        
     }
 
     useEffect(() => {
-        getAllBooking()
-    }, [])
+        if (user) {
+            getAllBooking()
+        }
+    }, [user])
 
     const getStatusBadge = (isPaid) => {
         if (isPaid) {

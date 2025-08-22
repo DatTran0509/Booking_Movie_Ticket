@@ -5,22 +5,38 @@ import Title from '../../components/admin/Title'
 import BlurCircle from '../../components/BlurCircle'
 import { kConverter } from '../../lib/kConverter'
 import { CheckIcon, DeleteIcon, Star, Calendar, Clock, DollarSign, Plus } from 'lucide-react'
+import { useAppContext } from '../../context/AppContext'
+import toast from 'react-hot-toast'
 
 const AddShows = () => {
+    const {axios, getToken, user, image_base_url} = useAppContext();
+
     const currency = import.meta.env.VITE_CURRENCY || '$'
     const [nowPlayingMovies, setNowPlayingMovies] = useState([])
     const [selectedMovie, setSelectedMovie] = useState(null)
     const [dateTimeSelection, setDateTimeSelection] = useState({})
     const [dateTimeInput, setDateTimeInput] = useState('')
     const [showPrice, setShowPrice] = useState('')
+    const [addingShow, setAddingShow] = useState(false)     
 
     const fetchNowPlayingMovies = async () => {
-        setNowPlayingMovies(dummyShowsData)
+        try {
+            const {data} = await axios.get('/api/show/now-playing', {
+                headers: {Authorization: `Bearer ${await getToken()}`}
+            })
+            if(data.success) {
+                setNowPlayingMovies(data.movies)
+            }
+        } catch (error) {
+            console.error('Error fetching now playing movies:', error)
+            // ✅ Fallback to dummy data nếu API fail
+            setNowPlayingMovies(dummyShowsData)
+        }
     }
 
     const handleDateTimeAdd = () => {
         if (!dateTimeInput) {
-            alert('Please select a date and time')
+            toast.error('Please select a date and time')
             return
         }
         const [date, time] = dateTimeInput.split('T');
@@ -53,24 +69,56 @@ const AddShows = () => {
         })
     }
 
-    const handleAddShow = () => {
-        if (!selectedMovie || !showPrice || Object.keys(dateTimeSelection).length === 0) {
-            alert('Please fill in all fields')
-            return
+    const handleAddShow = async () => {
+        try {
+            setAddingShow(true)
+            
+            // ✅ Validation với early return
+            if (!selectedMovie || !showPrice || Object.keys(dateTimeSelection).length === 0) {
+                toast.error('Missing required fields')
+                return
+            }
+
+            const showsInput = Object.entries(dateTimeSelection).map(([date, times]) => ({
+                date,
+                times,
+            }))
+            
+            const payload = {
+                movieId: selectedMovie,
+                showsInput,
+                showPrice: parseFloat(showPrice),
+            }
+
+
+            const {data} = await axios.post('/api/show/add', payload, {
+                headers: {Authorization: `Bearer ${await getToken()}`}
+            })
+            
+            
+            if(data.success) {
+                toast.success('Show added successfully')
+                // ✅ FIX: Dùng setSelectedMovie thay vì selectedMovie
+                setSelectedMovie(null)
+                setDateTimeSelection({})
+                setShowPrice('')
+            } else {
+                toast.error(data.message)
+            }
+        } catch (error) {
+            console.error('❌ Error adding show:', error)
+            toast.error(error.response?.data?.message || 'Failed to add show')
+        } finally {
+            // ✅ Đảm bảo setAddingShow(false) luôn chạy
+            setAddingShow(false)
         }
-        // Handle add show logic here
-        console.log('Adding show:', { selectedMovie, showPrice, dateTimeSelection })
-        alert('Show added successfully!')
-        
-        // Reset form
-        setSelectedMovie(null)
-        setShowPrice('')
-        setDateTimeSelection({})
     }
 
     useEffect(() => {
-        fetchNowPlayingMovies()
-    }, [])
+        if(user) {
+            fetchNowPlayingMovies()
+        }
+    }, [user])
 
     return nowPlayingMovies.length > 0 ? (
         <div className="min-h-screen bg-black text-white p-6 relative">
@@ -105,7 +153,7 @@ const AddShows = () => {
                             {/* Movie Poster */}
                             <div className="relative overflow-hidden">
                                 <img 
-                                    src={movie.poster_path} 
+                                    src={image_base_url + movie.poster_path} 
                                     alt={movie.title}
                                     className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-500"
                                 />
@@ -115,7 +163,7 @@ const AddShows = () => {
                                 <div className="absolute top-3 left-3">
                                     <div className="flex items-center gap-1 bg-yellow-500/90 text-white text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm">
                                         <Star className="w-3 h-3 fill-current" />
-                                        <span>{movie.vote_average.toFixed(1)}</span>
+                                        <span>{movie.vote_average?.toFixed(1) || '8.5'}</span>
                                     </div>
                                 </div>
 
@@ -136,7 +184,7 @@ const AddShows = () => {
                                 </h3>
                                 <div className="flex items-center justify-between text-sm text-gray-400">
                                     <span>{movie.release_date}</span>
-                                    <span>{kConverter(movie.vote_count)} Votes</span>
+                                    <span>{kConverter(movie.vote_count || 1000)} Votes</span>
                                 </div>
                             </div>
                         </div>
@@ -161,6 +209,8 @@ const AddShows = () => {
                             value={showPrice}
                             onChange={(e) => setShowPrice(e.target.value)}
                             placeholder="Enter show price"
+                            min="0"
+                            step="0.01"
                             className="w-full pl-12 pr-4 py-3 bg-gray-700/30 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300"
                         />
                     </div>
@@ -181,6 +231,7 @@ const AddShows = () => {
                                 type="datetime-local" 
                                 value={dateTimeInput} 
                                 onChange={(e) => setDateTimeInput(e.target.value)}
+                                min={new Date().toISOString().slice(0, 16)}
                                 className="w-full px-4 py-3 bg-gray-700/30 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300"
                             />
                         </div>
@@ -247,11 +298,22 @@ const AddShows = () => {
                 <button 
                     onClick={handleAddShow}
                     className="px-8 py-4 bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white font-bold text-lg rounded-xl transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!selectedMovie || !showPrice || Object.keys(dateTimeSelection).length === 0}
+                    disabled={addingShow || !selectedMovie || !showPrice || Object.keys(dateTimeSelection).length === 0}
                 >
-                    Add Show
+                    {addingShow ? 'Adding Show...' : 'Add Show'}
                 </button>
             </div>
+
+            {/* ✅ Debug panel để kiểm tra */}
+            {/* {process.env.NODE_ENV === 'development' && (
+                <div className="fixed bottom-4 right-4 bg-gray-900/90 p-3 rounded-lg text-xs border border-gray-700">
+                    <div className="text-green-400">Debug Info:</div>
+                    <div>Selected: {selectedMovie || 'None'}</div>
+                    <div>Price: {showPrice || 'Empty'}</div>
+                    <div>Times: {Object.keys(dateTimeSelection).length}</div>
+                    <div>Valid: {selectedMovie && showPrice && Object.keys(dateTimeSelection).length > 0 ? '✅' : '❌'}</div>
+                </div>
+            )} */}
         </div>
     ) : <Loading />
 }

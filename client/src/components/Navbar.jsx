@@ -4,8 +4,11 @@ import { assets } from '../assets/assets'
 import { MenuIcon, SearchIcon, XIcon } from 'lucide-react'
 import { useClerk, UserButton, useUser } from '@clerk/clerk-react'
 import { TicketPlus } from 'lucide-react'
+import { useAppContext } from '../context/AppContext'
 
 const Navbar = () => {
+  const {favoriteMovies} = useAppContext()
+
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const location = useLocation()
@@ -119,7 +122,7 @@ const Navbar = () => {
             (
               <UserButton>
                 <UserButton.MenuItems>
-                  <UserButton.Action label='My Bookings' labelIcon={<TicketPlus width={15}/>} onClick={() => navigate('/')} />
+                  <UserButton.Action label='My Bookings' labelIcon={<TicketPlus width={15}/>} onClick={() => navigate('/my-bookings')} />
                 </UserButton.MenuItems>
               </UserButton>
             )

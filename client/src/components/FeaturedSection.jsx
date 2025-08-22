@@ -2,10 +2,12 @@ import { ArrowRight } from 'lucide-react'
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BlurCircle from './BlurCircle'
-import { dummyShowsData } from '../assets/assets'
 import MovieCard from './MovieCard'
+import { useAppContext } from '../context/AppContext'
 
 const FeaturedSection = () => {
+    const {shows} = useAppContext()
+
     const navigate = useNavigate()
     const [isVisible, setIsVisible] = useState(false)
 
@@ -53,7 +55,7 @@ const FeaturedSection = () => {
             
             {/* Movies Grid with Staggered Animation */}
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-6 md:gap-8 mb-12'>
-                {dummyShowsData.slice(0, 8).map((show, index) => (
+                {shows.slice(0, 8).map((show, index) => (
                     <div
                         key={show._id}
                         className={`transform transition-all duration-1000 delay-${index * 100} ${

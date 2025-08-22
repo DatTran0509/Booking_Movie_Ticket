@@ -1,29 +1,53 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { dummyShowsData, dummyDateTimeData } from '../assets/assets'
 import BlurCircle from '../components/BlurCircle'
 import MovieCard from '../components/MovieCard'
 import { Heart, Play, Star, Clock, Calendar, Tag, ChevronRight } from 'lucide-react'
 import timeFormat from '../lib/timeFormat'
 import DateSlect from '../components/DateSlect'
 import Loading from '../components/Loading'
-
+import { useAppContext } from '../context/AppContext'
+import toast from 'react-hot-toast'
 const MovieDetails = () => {
+  const {shows, axios, getToken, user, image_base_url, fetchFavoriteMovies,favoriteMovies} = useAppContext()
   const { id } = useParams()
   const [show, setShow] = useState(null)
   const [isVisible, setIsVisible] = useState(false)
-  const [isLiked, setIsLiked] = useState(false)
   const navigate = useNavigate()
 
+  const isFavorited = favoriteMovies.find(movie => movie._id === id)
+
   const getShow = async () => {
-    const show = dummyShowsData.find((show) => show._id === id)
-    if(show) {
-      setShow({
-        movie: show,
-        dateTime: dummyDateTimeData
+    try {
+      const {data} = await axios.get(`/api/show/${id}`, {
+        headers: { Authorization: `Bearer ${await getToken()}` }
       })
+      if (data.success) {
+        setShow(data)
+      }
+      else {
+        console.log(data.message)
+      }
+    } catch (error) {
+      
     }
   }
+  const handleFavorite = async () => {
+    try {
+      if(!user) return toast.error('Please login to add to favorites')
+
+      const {data} = await axios.post('/api/user/update-favorite', {movieId: id}, {
+        headers: { Authorization: `Bearer ${await getToken()}` }
+      })
+      if (data.success) {
+        await fetchFavoriteMovies() // This will update favoriteMovies in context
+        toast.success(data.message)
+      }
+    } catch (error) {
+      console.log(error)
+      toast.error('Failed to update favorites')
+    }
+  } 
 
   useEffect(() => {
     getShow()
@@ -32,10 +56,6 @@ const MovieDetails = () => {
     }, 200)
     return () => clearTimeout(timer)
   }, [id])
-
-  const handleLike = () => {
-    setIsLiked(!isLiked)
-  }
 
   const handleBuyTickets = () => {
     document.getElementById('date-select')?.scrollIntoView({ 
@@ -49,7 +69,7 @@ const MovieDetails = () => {
       {/* Background Image with Overlay */}
       <div className='absolute inset-0'>
         <img
-          src={show.movie.poster_path}
+          src={image_base_url + show.movie.poster_path}
           alt={show.movie.title}
           className='w-full h-full object-cover opacity-20'
         />
@@ -79,7 +99,7 @@ const MovieDetails = () => {
               <div className='absolute inset-0 bg-gradient-to-br from-primary/30 to-primary/10 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500'></div>
               <div className='relative overflow-hidden rounded-2xl border-2 border-white/10 group-hover:border-primary/30 transition-all duration-500 hover:scale-105 transform'>
                 <img
-                  src={show.movie.poster_path}
+                  src={image_base_url+show.movie.poster_path}
                   alt={show.movie.title}
                   className='w-full max-w-[350px] lg:max-w-[400px] h-auto object-cover'
                 />
@@ -177,15 +197,17 @@ const MovieDetails = () => {
 
                 {/* Like Button */}
                 <button
-                  onClick={handleLike}
+                  onClick={handleFavorite}
                   className={`group w-12 h-12 rounded-full backdrop-blur-sm border transition-all duration-300 hover:scale-110 flex items-center justify-center ${
-                    isLiked
-                      ? 'bg-red-500/20 border-red-500/40 text-red-500'
-                      : 'bg-white/10 hover:bg-white/20 border-white/20 hover:border-red-500/40 text-white hover:text-red-500'
+                    isFavorited
+                      ? 'bg-red-500/20 border-red-500/40'
+                      : 'bg-white/10 hover:bg-white/20 border-white/20 hover:border-red-500/40'
                   }`}
                 >
                   <Heart className={`w-5 h-5 transition-all duration-300 ${
-                    isLiked ? 'fill-current scale-110' : 'group-hover:scale-110'
+                    isFavorited
+                      ? 'text-red-500 fill-red-500 scale-110' 
+                      : 'text-white group-hover:text-red-500 group-hover:scale-110'
                   }`} />
                 </button>
               </div>
@@ -215,7 +237,7 @@ const MovieDetails = () => {
                   <div className='relative'>
                     <div className='absolute inset-0 bg-primary/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300'></div>
                     <img 
-                      src={cast.profile_path} 
+                      src={image_base_url + cast.profile_path} 
                       alt={cast.name}
                       className='relative w-20 h-20 rounded-full object-cover border-2 border-white/10 group-hover:border-primary/30 transition-all duration-300 group-hover:scale-105' 
                     />
@@ -255,7 +277,7 @@ const MovieDetails = () => {
           </div>
 
           <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6'>
-            {dummyShowsData.slice(0, 4).map((movie, index) => (
+            {shows.slice(0, 4).map((movie, index) => (
               <div
                 key={index}
                 className={`transition-all duration-700 ${

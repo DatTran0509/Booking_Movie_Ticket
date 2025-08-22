@@ -17,10 +17,7 @@ const TrailersSection = () => {
         return () => clearTimeout(timer)
     }, [])
 
-    // Debug: Log current trailer
-    console.log('Current trailer:', currentTrailer)
-    console.log('Video URL:', currentTrailer?.videoUrl)
-
+   
     // Extract video title from URL for display
     const getVideoTitle = (url) => {
         if (!url) return 'Untitled'

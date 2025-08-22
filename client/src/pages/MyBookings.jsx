@@ -4,25 +4,39 @@ import Loading from '../components/Loading'
 import BlurCircle from '../components/BlurCircle'
 import timeFormat from '../lib/timeFormat'
 import { Calendar, Clock, MapPin, Users, CreditCard, Ticket, Star, ArrowRight } from 'lucide-react'
-
+import { useAppContext } from '../context/AppContext'
 const MyBookings = () => {
+  const {shows, axios, getToken, user, image_base_url, fetchFavoriteMovies,favoriteMovies} = useAppContext()
+  
   const currency = '$'
   const [bookings, setBookings] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isVisible, setIsVisible] = useState(false)
 
   const getMyBookings = async () => {
-    // Simulate API call
-    setTimeout(() => {
-      setBookings(dummyBookingData)
-      setIsLoading(false)
-      setTimeout(() => setIsVisible(true), 100)
-    }, 1000)
+    try {
+      const {data} = await axios.get('/api/user/bookings', {
+        headers: { Authorization: `Bearer ${await getToken()}` }
+      })
+      if (data.success) {
+        setBookings(data.bookings)
+        setIsVisible(true)
+      }
+      else {
+        console.error(data.message)
+      }
+      
+    } catch (error) {
+      console.error('Error fetching bookings:', error)
+    }
+    setIsLoading(false)
   }
 
   useEffect(() => {
-    getMyBookings()
-  }, [])
+    if (user) {
+      getMyBookings()
+    }
+  }, [user])
 
   const formatDateTime = (dateTime) => {
     const date = new Date(dateTime)
@@ -101,7 +115,7 @@ const MyBookings = () => {
                       <div className='absolute inset-0 bg-gradient-to-br from-primary/30 to-primary/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500'></div>
                       <div className='relative overflow-hidden rounded-2xl border-2 border-white/10 group-hover/poster:border-primary/30 transition-all duration-500'>
                         <img 
-                          src={item.show.movie.poster_path} 
+                          src={image_base_url+item.show.movie.poster_path} 
                           className='w-24 md:w-32 h-36 md:h-48 object-cover group-hover/poster:scale-105 transition-transform duration-500' 
                           alt={item.show.movie.title}
                         />
