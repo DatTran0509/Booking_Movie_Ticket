@@ -4,7 +4,6 @@ import Booking from '../models/Booking.js';
 export const stripeWebhooks = async (req, res) => {
     console.log('🔗 Webhook received:', new Date().toISOString());
     
-    // ✅ Fix parameter names để tránh conflict
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const sig = req.headers['stripe-signature'];
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -21,7 +20,6 @@ export const stripeWebhooks = async (req, res) => {
 
     let event;
     try {
-        // ✅ Use req.body instead of request.body
         event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
         console.log('✅ Webhook event verified:', event.type);
     } catch (error) {
@@ -31,65 +29,85 @@ export const stripeWebhooks = async (req, res) => {
 
     try {
         switch (event.type) {
-            // ✅ Change to checkout.session.completed (more reliable)
-            case "checkout.session.completed":
+            // ✅ Handle payment_intent.succeeded - when payment is actually completed
+            case "payment_intent.succeeded":
                 {
-                    console.log('🛒 Processing checkout.session.completed');
-                    const session = event.data.object;
+                    console.log('💰 Processing payment_intent.succeeded');
+                    const paymentIntent = event.data.object;
+                    console.log('💰 Payment Intent ID:', paymentIntent.id);
+                    
+                    // Get the checkout session associated with this payment intent
+                    const sessions = await stripe.checkout.sessions.list({
+                        payment_intent: paymentIntent.id,
+                    });
+
+                    console.log('📋 Sessions found:', sessions.data.length);
+
+                    if (sessions.data.length === 0) {
+                        console.log('❌ No checkout session found for payment intent');
+                        break;
+                    }
+
+                    const session = sessions.data[0];
                     const { bookingId } = session.metadata || {};
                     
                     console.log('🎫 Session ID:', session.id);
-                    console.log('🎫 Payment Status:', session.payment_status);
-                    console.log('🎫 Booking ID:', bookingId);
+                    console.log('🎫 Booking ID from metadata:', bookingId);
                     console.log('📊 Metadata:', session.metadata);
 
                     if (!bookingId) {
                         console.log('❌ No bookingId in metadata');
-                        return res.status(400).json({ error: 'No booking ID found' });
+                        break;
                     }
 
-                    // ✅ Only process if payment was successful
-                    if (session.payment_status === 'paid') {
-                        const booking = await Booking.findById(bookingId);
-                        
-                        if (!booking) {
-                            console.log('❌ Booking not found:', bookingId);
-                            return res.status(404).json({ error: 'Booking not found' });
-                        }
-
-                        console.log('📝 Booking before update:', {
-                            id: booking._id,
-                            isPaid: booking.isPaid,
-                            amount: booking.amount
-                        });
-
-                        // ✅ Update booking status
-                        const updatedBooking = await Booking.findByIdAndUpdate(
-                            bookingId,
-                            {
-                                isPaid: true,
-                                paymentLink: "",
-                                stripeSessionId: session.id,
-                                paidAt: new Date()
-                            },
-                            { new: true }
-                        );
-
-                        console.log('✅ Booking updated successfully:', {
-                            id: updatedBooking._id,
-                            isPaid: updatedBooking.isPaid,
-                            paidAt: updatedBooking.paidAt
-                        });
-                    } else {
-                        console.log('⚠️ Payment not completed:', session.payment_status);
+                    const booking = await Booking.findById(bookingId);
+                    
+                    if (!booking) {
+                        console.log('❌ Booking not found:', bookingId);
+                        break;
                     }
+
+                    // ✅ Check if already paid to avoid duplicate updates
+                    if (booking.isPaid) {
+                        console.log('ℹ️ Booking already marked as paid:', bookingId);
+                        break;
+                    }
+
+                    console.log('📝 Booking before update:', {
+                        id: booking._id,
+                        isPaid: booking.isPaid,
+                        amount: booking.amount,
+                        selectedSeats: booking.selectedSeats
+                    });
+
+                    // ✅ Update booking status
+                    const updatedBooking = await Booking.findByIdAndUpdate(
+                        bookingId,
+                        {
+                            isPaid: true,
+                            paymentLink: "",
+                            paymentIntentId: paymentIntent.id,
+                            stripeSessionId: session.id,
+                            paidAt: new Date()
+                        },
+                        { new: true }
+                    );
+
+                    console.log('✅ Booking updated successfully:', {
+                        id: updatedBooking._id,
+                        isPaid: updatedBooking.isPaid,
+                        paidAt: updatedBooking.paidAt,
+                        paymentIntentId: updatedBooking.paymentIntentId
+                    });
 
                     break;
                 }
 
-            case "payment_intent.succeeded":
+            case "checkout.session.completed":
                 {
-                    console.log('💰 Payment intent succeeded - already handled by checkout.session.completed');
+                    console.log('🛒 Checkout session completed - waiting for payment_intent.succeeded');
+                    const session = event.data.object;
+                    console.log('🎫 Session:', session.id, 'Payment Status:', session.payment_status);
                     break;
                 }
                 
