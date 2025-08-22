@@ -75,7 +75,7 @@ const releaseSeatsAndDeleteBooking = inngest.createFunction(
 )
 const sendBookingConfirmationEmail = inngest.createFunction(
     {id: 'send-booking-confirmation-email'},
-    {event: 'app/show.booked'},
+    {event: 'app/booking.booked'},
     async ({event, step}) => {
         const {bookingId} = event.data;
         
@@ -130,12 +130,12 @@ const sendBookingConfirmationEmail = inngest.createFunction(
                             
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #404040;">
                                 <span style="color: #9ca3af;">🎫 Seats:</span>
-                                <strong style="color: #10b981;">${booking.selectedSeats.join(', ')}</strong>
+                                <strong style="color: #10b981;">${booking.bookedSeats.join(', ')}</strong>
                             </div>
                             
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #404040;">
                                 <span style="color: #9ca3af;">👥 Total Tickets:</span>
-                                <strong style="color: #ffffff;">${booking.selectedSeats.length}</strong>
+                                <strong style="color: #ffffff;">${booking.bookedSeats.length}</strong>
                             </div>
                             
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; background-color: #374151; border-radius: 8px; padding: 15px; margin-top: 10px;">
