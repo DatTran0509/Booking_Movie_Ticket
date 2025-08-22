@@ -5,6 +5,7 @@ import BlurCircle from '../components/BlurCircle'
 import timeFormat from '../lib/timeFormat'
 import { Calendar, Clock, MapPin, Users, CreditCard, Ticket, Star, ArrowRight } from 'lucide-react'
 import { useAppContext } from '../context/AppContext'
+import { Link } from 'react-router-dom'
 const MyBookings = () => {
   const {shows, axios, getToken, user, image_base_url, fetchFavoriteMovies,favoriteMovies} = useAppContext()
   
@@ -18,6 +19,7 @@ const MyBookings = () => {
       const {data} = await axios.get('/api/user/bookings', {
         headers: { Authorization: `Bearer ${await getToken()}` }
       })
+      console.log(data.bookings)
       if (data.success) {
         setBookings(data.bookings)
         setIsVisible(true)
@@ -145,7 +147,7 @@ const MyBookings = () => {
                       <div className='flex flex-wrap items-center gap-4 text-gray-300'>
                         <div className='flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10'>
                           <Calendar className='w-4 h-4 text-primary' />
-                          <span className='text-sm font-medium'>{dateTime.date}</span>
+                          <span className='text-sm font-medium'>{item.show.showDateTime}</span>
                         </div>
                         <div className='flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10'>
                           <Clock className='w-4 h-4 text-primary' />
@@ -196,12 +198,12 @@ const MyBookings = () => {
 
                     {/* Payment Button */}
                     {!item.isPaid && (
-                      <button className='group/btn flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white font-semibold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30 hover:shadow-primary/50 relative overflow-hidden'>
+                      <Link to =  {item.paymentLink} className='group/btn flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white font-semibold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30 hover:shadow-primary/50 relative overflow-hidden'>
                         <CreditCard className='w-5 h-5' />
                         <span className='relative z-10'>Pay Now</span>
                         <ArrowRight className='w-4 h-4 group-hover/btn:translate-x-1 transition-transform duration-300' />
                         <div className='absolute inset-0 bg-white/10 translate-x-[-100%] group-hover/btn:translate-x-0 transition-transform duration-500'></div>
-                      </button>
+                      </Link>
                     )}
 
                     {item.isPaid && (

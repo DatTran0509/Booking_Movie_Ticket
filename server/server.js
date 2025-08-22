@@ -13,8 +13,7 @@ import { stripeWebhooks } from './controllers/stripeWebhooks.js';
 const app = express();
 const port = process.env.PORT || 3000;
 //Stripe webhooks route
-app.use('/api/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
-
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhooks);
 // Middleware
 app.use(cors());
 app.use(express.json());

@@ -89,7 +89,6 @@ const SeatLayout = () => {
   const getOccupiedSeats = async () => {
     try {
       const {data} = await axios.get(`/api/booking/seats/${selectedTime.showId}`)
-      console.log('Occupied Seats Data:', data)
       if (data.success) {
         setOccupiedSeats(data.occupiedSeats)
       }else {
@@ -107,7 +106,6 @@ const SeatLayout = () => {
         headers: { Authorization: `Bearer ${await getToken()}` }
       })
       
-      console.log('Show Price Data:', data)
       if (data.success) {
         setShowPrice(data.showPrice)
       } else {
@@ -134,6 +132,7 @@ const SeatLayout = () => {
         //     border: '1px solid #10b981'
         //   }
         // })
+        console.log(data.url)
         window.location.href = data.url
         
       }else{
