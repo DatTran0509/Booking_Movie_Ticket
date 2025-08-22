@@ -19,7 +19,7 @@ const MyBookings = () => {
       const {data} = await axios.get('/api/user/bookings', {
         headers: { Authorization: `Bearer ${await getToken()}` }
       })
-      console.log(data.bookings)
+
       if (data.success) {
         setBookings(data.bookings)
         setIsVisible(true)
@@ -40,13 +40,22 @@ const MyBookings = () => {
     }
   }, [user])
 
-  const formatDateTime = (dateTime) => {
-    const date = new Date(dateTime)
+  const formatDateTime = (isoString) => {
+    if (!isoString) return { date: 'N/A', time: 'N/A' }
+    
+    const date = new Date(isoString)
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return { date: 'Invalid Date', time: 'Invalid Time' }
+    }
+    
     return {
       date: date.toLocaleDateString('en-US', { 
         weekday: 'short', 
         month: 'short', 
-        day: 'numeric' 
+        day: 'numeric',
+        year: 'numeric'
       }),
       time: date.toLocaleTimeString('en-US', { 
         hour: '2-digit', 
@@ -94,7 +103,7 @@ const MyBookings = () => {
         {/* Bookings List */}
         <div className='max-w-4xl mx-auto space-y-6'>
           {bookings.map((item, index) => {
-            const dateTime = formatDateTime(item.show.movie.showDateTime)
+            const dateTime = formatDateTime(item.show.showDateTime)
             
             return (
               <div 
@@ -147,7 +156,7 @@ const MyBookings = () => {
                       <div className='flex flex-wrap items-center gap-4 text-gray-300'>
                         <div className='flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10'>
                           <Calendar className='w-4 h-4 text-primary' />
-                          <span className='text-sm font-medium'>{item.show.showDateTime}</span>
+                          <span className='text-sm font-medium'>{dateTime.date}</span>
                         </div>
                         <div className='flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10'>
                           <Clock className='w-4 h-4 text-primary' />
@@ -165,13 +174,15 @@ const MyBookings = () => {
                           <div className='flex items-center gap-2 text-gray-400'>
                             <Users className='w-4 h-4 text-primary' />
                             <span className='text-sm'>Total Tickets: </span>
-                            <span className='text-white font-semibold'>{item.bookedSeats.length}</span>
+                            <span className='text-white font-semibold'>
+                              {item.selectedSeats?.length || item.bookedSeats?.length || 0}
+                            </span>
                           </div>
                           <div className='flex items-center gap-2 text-gray-400'>
                             <Ticket className='w-4 h-4 text-primary' />
                             <span className='text-sm'>Seats: </span>
-                            <div className='flex gap-1'>
-                              {item.bookedSeats.map((seat, i) => (
+                            <div className='flex gap-1 flex-wrap'>
+                              {(item.selectedSeats || item.bookedSeats || []).map((seat, i) => (
                                 <span key={i} className='px-2 py-1 bg-primary/20 text-primary text-xs rounded-lg font-medium border border-primary/30'>
                                   {seat}
                                 </span>
@@ -179,6 +190,8 @@ const MyBookings = () => {
                             </div>
                           </div>
                         </div>
+                        
+                        
                       </div>
                     </div>
                   </div>
@@ -198,7 +211,7 @@ const MyBookings = () => {
 
                     {/* Payment Button */}
                     {!item.isPaid && (
-                      <Link to =  {item.paymentLink} className='group/btn flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white font-semibold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30 hover:shadow-primary/50 relative overflow-hidden'>
+                      <Link to={item.paymentLink} className='group/btn flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white font-semibold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30 hover:shadow-primary/50 relative overflow-hidden'>
                         <CreditCard className='w-5 h-5' />
                         <span className='relative z-10'>Pay Now</span>
                         <ArrowRight className='w-4 h-4 group-hover/btn:translate-x-1 transition-transform duration-300' />
@@ -214,8 +227,6 @@ const MyBookings = () => {
                     )}
                   </div>
                 </div>
-
-               
               </div>
             )
           })}
