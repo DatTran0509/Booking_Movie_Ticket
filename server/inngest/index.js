@@ -185,7 +185,7 @@ const sendBookingConfirmationEmail = inngest.createFunction(
             </div>
             `;
             
-
+            console.log(booking.user.email)
             await sendEmail({
                 to: booking.user.email,
                 subject: `🎬 Booking Confirmation: ${booking.show.movie.title} - Seat${booking.bookedSeats.length > 1 ? 's' : ''} ${booking.bookedSeats.join(', ')}`,
