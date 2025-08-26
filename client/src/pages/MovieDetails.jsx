@@ -87,7 +87,7 @@ const MovieDetails = () => {
         <img
           src={image_base_url + show.movie.poster_path}
           alt={show.movie.title}
-          className='w-full h-full object-cover opacity-30' // ✅ Even brighter
+          className='w-full h-full object-cover opacity-40' // ✅ Even brighter
         />
         <div className='absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent'></div> {/* ✅ Less overlay */}
         <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30'></div> {/* ✅ Less overlay */}
