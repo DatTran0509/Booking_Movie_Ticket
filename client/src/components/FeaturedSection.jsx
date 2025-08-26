@@ -53,16 +53,20 @@ const FeaturedSection = () => {
                 </button>
             </div>
             
-            {/* Movies Grid with Staggered Animation */}
-            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6 lg:gap-8 mb-12'>
+            {/* ✅ Enhanced Movies Grid with Better Responsive Design */}
+            <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5 lg:gap-6 mb-12'>
                 {shows.slice(0, 10).map((show, index) => (
                     <div
                         key={show._id}
-                        className={`transform transition-all duration-1000 delay-${index * 100} ${
+                        className={`transform transition-all duration-1000 ${
                             isVisible 
                                 ? 'translate-y-0 opacity-100 scale-100' 
                                 : 'translate-y-20 opacity-0 scale-95'
                         }`}
+                        style={{ 
+                            animationDelay: `${index * 100}ms`,
+                            minHeight: 'fit-content'
+                        }}
                     >
                         <MovieCard movie={show} />
                     </div>
