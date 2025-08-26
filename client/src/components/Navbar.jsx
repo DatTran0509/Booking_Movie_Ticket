@@ -82,17 +82,7 @@ const Navbar = () => {
           <span className='absolute inset-0 rounded-lg bg-primary/10 scale-0 group-hover:scale-100 transition-transform duration-300 -z-10' />
         </Link>
 
-        <Link
-          onClick={() => { scrollTo(0, 0), setIsOpen(false) }}
-          to='/releases'
-          className={`relative font-medium transition-all duration-300 hover:text-primary hover:scale-110 group max-md:text-white md:text-white/90 ${location.pathname === '/releases' ? 'text-primary scale-110 font-semibold' : ''
-            }`}
-        >
-          <span className='relative z-10'>Releases</span>
-          <span className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${location.pathname === '/releases' ? 'w-full' : 'w-0 group-hover:w-full'
-            }`} />
-          <span className='absolute inset-0 rounded-lg bg-primary/10 scale-0 group-hover:scale-100 transition-transform duration-300 -z-10' />
-        </Link>
+        
 
         <Link
           onClick={() => { scrollTo(0, 0), setIsOpen(false) }}

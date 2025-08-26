@@ -3,7 +3,7 @@ import BlurCircle from './BlurCircle'
 import { ChevronLeftIcon, ChevronRightIcon, Calendar, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
-const DateSlect = ({ dateTime, id }) => {
+const DateSelect = ({ dateTime, id }) => {
   const [selectedDate, setSelectedDate] = useState(null)
   const [isVisible, setIsVisible] = useState(false)
   const [currentWeek, setCurrentWeek] = useState(0)
@@ -144,7 +144,7 @@ const DateSlect = ({ dateTime, id }) => {
                         
                         <div className='relative z-10 flex flex-col items-center justify-center h-full'>
                           <span className={`text-xs font-medium mb-1 ${
-                            isSelected ? 'text-white' : 'text-gray-400'
+                            isSelected ? 'text-white' : 'text-gray-300'
                           }`}>
                             {dateInfo.weekday}
                           </span>
@@ -154,7 +154,7 @@ const DateSlect = ({ dateTime, id }) => {
                             {dateInfo.day}
                           </span>
                           <span className={`text-xs ${
-                            isSelected ? 'text-white/90' : 'text-gray-500'
+                            isSelected ? 'text-white/90' : 'text-gray-300'
                           }`}>
                             {dateInfo.month}
                           </span>
@@ -246,4 +246,4 @@ const DateSlect = ({ dateTime, id }) => {
   )
 }
 
-export default DateSlect
+export default DateSelect

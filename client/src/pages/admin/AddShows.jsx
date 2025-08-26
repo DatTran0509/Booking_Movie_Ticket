@@ -1,134 +1,234 @@
 import React, { useState, useEffect } from 'react'
-import { dummyShowsData } from '../../assets/assets'
-import Loading from '../../components/Loading'
+import { useAppContext } from '../../context/AppContext'
 import Title from '../../components/admin/Title'
 import BlurCircle from '../../components/BlurCircle'
-import { kConverter } from '../../lib/kConverter'
-import { CheckIcon, DeleteIcon, Star, Calendar, Clock, DollarSign, Plus } from 'lucide-react'
-import { useAppContext } from '../../context/AppContext'
+import Loading from '../../components/Loading'
+import { Calendar, Clock, DollarSign, Plus, DeleteIcon, CheckIcon, Star, MapPin, Info } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const AddShows = () => {
-    const {axios, getToken, user, image_base_url} = useAppContext();
-
+    const {axios, getToken, user} = useAppContext()
     const currency = import.meta.env.VITE_CURRENCY || '$'
+    
+    const [loading, setLoading] = useState(true)
     const [nowPlayingMovies, setNowPlayingMovies] = useState([])
     const [selectedMovie, setSelectedMovie] = useState(null)
-    const [dateTimeSelection, setDateTimeSelection] = useState({})
-    const [dateTimeInput, setDateTimeInput] = useState('')
+    const [selectedMovieRuntime, setSelectedMovieRuntime] = useState(120)
+    const [selectedMovieTitle, setSelectedMovieTitle] = useState('')
     const [showPrice, setShowPrice] = useState('')
-    const [addingShow, setAddingShow] = useState(false)     
+    const [selectedHall, setSelectedHall] = useState('')
+    const [dateTimeInput, setDateTimeInput] = useState('')
+    const [dateTimeSelection, setDateTimeSelection] = useState({})
+    const [availableHalls, setAvailableHalls] = useState([])
+
+    const loadAvailableHalls = () => {
+        const savedHalls = localStorage.getItem('cinemaHalls')
+        if (savedHalls) {
+            const halls = JSON.parse(savedHalls)
+            const available = halls.filter(hall => hall.isAvailable)
+            setAvailableHalls(available)
+        } else {
+            const defaultHalls = [
+                { name: 'Hall 1', isAvailable: true },
+                { name: 'Hall 2', isAvailable: true },
+                { name: 'Hall 3', isAvailable: true },
+                { name: 'Hall 4', isAvailable: true },
+                { name: 'Hall 5', isAvailable: true }
+            ]
+            localStorage.setItem('cinemaHalls', JSON.stringify(defaultHalls))
+            setAvailableHalls(defaultHalls)
+        }
+    }
 
     const fetchNowPlayingMovies = async () => {
         try {
             const {data} = await axios.get('/api/show/now-playing', {
-                headers: {Authorization: `Bearer ${await getToken()}`}
+                headers: { Authorization: `Bearer ${await getToken()}` }
             })
-            if(data.success) {
+            
+            if (data.success) {
                 setNowPlayingMovies(data.movies)
+                setLoading(false)
             }
         } catch (error) {
-            console.error('Error fetching now playing movies:', error)
-            // ✅ Fallback to dummy data nếu API fail
-            setNowPlayingMovies(dummyShowsData)
+            console.error('Error fetching movies:', error)
+            toast.error('Failed to load movies')
         }
+    }
+
+    const fetchMovieRuntime = async (movieId) => {
+        try {
+            const {data} = await axios.get(`/api/show/movie-runtime/${movieId}`, {
+                headers: { Authorization: `Bearer ${await getToken()}` }
+            })
+            
+            if (data.success) {
+                setSelectedMovieRuntime(data.runtime)
+                setSelectedMovieTitle(data.title)
+            }
+        } catch (error) {
+            console.error('Error fetching movie runtime:', error)
+            setSelectedMovieRuntime(120)
+        }
+    }
+
+    const handleMovieSelect = (movieId) => {
+        setSelectedMovie(movieId)
+        fetchMovieRuntime(movieId)
+        setDateTimeSelection({})
+    }
+
+    useEffect(() => {
+        if (user) {
+            fetchNowPlayingMovies()
+            loadAvailableHalls()
+        }
+    }, [user])
+
+    // ✅ Updated validation - Movie runtime + 30 minute gap between shows
+    const isTimeSlotValid = (newTimeInput) => {
+        if (!newTimeInput || !selectedHall) return false
+        
+        const newTime = new Date(`${newTimeInput.split('T')[0]}T${newTimeInput.split('T')[1]}`)
+        // ✅ Required gap = Movie runtime + 30 minutes buffer
+        const requiredGapMs = (selectedMovieRuntime + 30) * 60 * 1000
+        
+        for (const [date, times] of Object.entries(dateTimeSelection)) {
+            for (const time of times) {
+                const existingTime = new Date(`${date}T${time}`)
+                const timeDiff = Math.abs(newTime - existingTime)
+                
+                if (timeDiff < requiredGapMs) {
+                    return false
+                }
+            }
+        }
+        
+        return true
     }
 
     const handleDateTimeAdd = () => {
         if (!dateTimeInput) {
-            toast.error('Please select a date and time')
+            toast.error('Please select date and time')
             return
         }
-        const [date, time] = dateTimeInput.split('T');
-        if (!date || !time) return;
 
-        setDateTimeSelection((prev) => {
-            const times = prev[date] || [];
-            if (!times.includes(time)) {
-                return {
-                    ...prev,
-                    [date]: [...times, time]
-                }
+        if (!selectedMovie) {
+            toast.error('Please select a movie first')
+            return
+        }
+
+        const selectedDateTime = new Date(dateTimeInput)
+        const now = new Date()
+        
+        if (selectedDateTime <= now) {
+            toast.error('Please select a future date and time')
+            return
+        }
+
+        // ✅ Validate with movie runtime + 30min gap
+        if (!isTimeSlotValid(dateTimeInput)) {
+            const requiredGapMinutes = selectedMovieRuntime + 30
+            toast.error(`This time conflicts with existing shows. Shows need ${requiredGapMinutes} minutes gap (${selectedMovieRuntime}min movie + 30min buffer).`)
+            return
+        }
+
+        const date = dateTimeInput.split('T')[0]
+        const time = dateTimeInput.split('T')[1]
+
+        setDateTimeSelection(prev => {
+            const updated = { ...prev }
+            if (!updated[date]) {
+                updated[date] = []
             }
-            return prev;
+            
+            if (!updated[date].includes(time)) {
+                updated[date].push(time)
+                updated[date].sort()
+                toast.success('Show time added')
+            } else {
+                toast.error('This time slot already exists')
+            }
+            
+            return updated
         })
-        setDateTimeInput('') // Clear input after adding
+        
+        setDateTimeInput('')
     }
 
     const handleRemoveTime = (date, time) => {
-        setDateTimeSelection((prev) => {
-            const filteredTimes = prev[date].filter(t => t !== time);
-            if (filteredTimes.length === 0) {
-                const { [date]: _, ...rest } = prev;
-                return rest;
+        setDateTimeSelection(prev => {
+            const updated = { ...prev }
+            updated[date] = updated[date].filter(t => t !== time)
+            if (updated[date].length === 0) {
+                delete updated[date]
             }
-            return {
-                ...prev,
-                [date]: filteredTimes
-            }
+            return updated
         })
+        toast.success('Show time removed')
     }
 
-    const handleAddShow = async () => {
-        try {
-            setAddingShow(true)
-            
-            // ✅ Validation với early return
-            if (!selectedMovie || !showPrice || Object.keys(dateTimeSelection).length === 0) {
-                toast.error('Missing required fields')
-                return
-            }
+    const handleSubmit = async () => {
+        if (!selectedMovie || !showPrice || !selectedHall || Object.keys(dateTimeSelection).length === 0) {
+            toast.error('Please fill all fields: movie, price, hall, and at least one show time')
+            return
+        }
 
+        if (parseFloat(showPrice) <= 0) {
+            toast.error('Show price must be greater than 0')
+            return
+        }
+
+        try {
             const showsInput = Object.entries(dateTimeSelection).map(([date, times]) => ({
                 date,
-                times,
+                times
             }))
-            
-            const payload = {
+
+            const {data} = await axios.post('/api/show/add', {
                 movieId: selectedMovie,
                 showsInput,
                 showPrice: parseFloat(showPrice),
-            }
-
-
-            const {data} = await axios.post('/api/show/add', payload, {
-                headers: {Authorization: `Bearer ${await getToken()}`}
+                hall: selectedHall
+            }, {
+                headers: { Authorization: `Bearer ${await getToken()}` }
             })
-            
-            
-            if(data.success) {
-                toast.success('Show added successfully')
-                // ✅ FIX: Dùng setSelectedMovie thay vì selectedMovie
+
+            if (data.success) {
+                toast.success(data.message)
                 setSelectedMovie(null)
-                setDateTimeSelection({})
+                setSelectedMovieRuntime(120)
+                setSelectedMovieTitle('')
                 setShowPrice('')
+                setSelectedHall('')
+                setDateTimeSelection({})
             } else {
                 toast.error(data.message)
             }
         } catch (error) {
-            console.error('❌ Error adding show:', error)
-            toast.error(error.response?.data?.message || 'Failed to add show')
-        } finally {
-            // ✅ Đảm bảo setAddingShow(false) luôn chạy
-            setAddingShow(false)
+            console.error('Error adding shows:', error)
+            toast.error('Failed to add shows')
         }
     }
 
-    useEffect(() => {
-        if(user) {
-            fetchNowPlayingMovies()
-        }
-    }, [user])
-
-    return nowPlayingMovies.length > 0 ? (
+    return !loading ? (
         <div className="min-h-screen bg-black text-white p-6 relative">
-            {/* Background Effects */}
             <BlurCircle top='-100px' left='0'/>
             <BlurCircle top='300px' right='100px'/>
             
             {/* Header */}
             <div className="mb-8">
                 <Title text1='Add' text2='Shows' />
+                <p className="text-gray-400 mt-2">Schedule movie shows across different cinema halls</p>
+                {selectedMovie && (
+                    <div className="mt-4 p-4 bg-primary/10 border border-primary/30 rounded-lg">
+                        <div className="flex items-center gap-2 text-primary">
+                            <Info className="w-5 h-5" />
+                            <span className="font-medium">Selected: {selectedMovieTitle}</span>
+                            <span className="text-sm">({selectedMovieRuntime} minutes runtime)</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Now Playing Movies Section */}
@@ -139,7 +239,7 @@ const AddShows = () => {
                     {nowPlayingMovies.map((movie) => (
                         <div 
                             key={movie.id} 
-                            onClick={() => setSelectedMovie(movie.id)}
+                            onClick={() => handleMovieSelect(movie.id)}
                             className={`
                                 relative bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm 
                                 border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 
@@ -150,16 +250,14 @@ const AddShows = () => {
                                 }
                             `}
                         >
-                            {/* Movie Poster */}
                             <div className="relative overflow-hidden">
                                 <img 
-                                    src={image_base_url + movie.poster_path} 
+                                    src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
                                     alt={movie.title}
                                     className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-500"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                                 
-                                {/* Rating Badge */}
                                 <div className="absolute top-3 left-3">
                                     <div className="flex items-center gap-1 bg-yellow-500/90 text-white text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm">
                                         <Star className="w-3 h-3 fill-current" />
@@ -167,7 +265,6 @@ const AddShows = () => {
                                     </div>
                                 </div>
 
-                                {/* Selection Indicator */}
                                 {selectedMovie === movie.id && (
                                     <div className="absolute top-3 right-3">
                                         <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center border-2 border-white shadow-lg">
@@ -177,14 +274,13 @@ const AddShows = () => {
                                 )}
                             </div>
 
-                            {/* Movie Info */}
                             <div className="p-4">
                                 <h3 className="text-white font-semibold text-base mb-2 line-clamp-2 group-hover:text-primary transition-colors">
                                     {movie.title}
                                 </h3>
                                 <div className="flex items-center justify-between text-sm text-gray-400">
                                     <span>{movie.release_date}</span>
-                                    <span>{kConverter(movie.vote_count || 1000)} Votes</span>
+                                    <span>{movie.vote_count || 1000} Votes</span>
                                 </div>
                             </div>
                         </div>
@@ -192,8 +288,47 @@ const AddShows = () => {
                 </div>
             </div>
 
-            {/* Show Price Input */}
-            <div className="mb-8">
+            {/* Hall Selection & Show Price */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <MapPin className="w-5 h-5 text-primary" />
+                        Select Cinema Hall
+                    </h3>
+                    
+                    {availableHalls.length === 0 ? (
+                        <div className="text-center py-8">
+                            <MapPin className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                            <p className="text-gray-400 mb-4">No halls available</p>
+                            <p className="text-sm text-gray-500">Please enable halls in Dashboard → Hall Settings</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3">
+                            {availableHalls.map((hall, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => setSelectedHall(hall.name)}
+                                    className={`p-4 rounded-xl border transition-all duration-300 text-left ${
+                                        selectedHall === hall.name
+                                            ? 'border-primary bg-primary/10 text-white'
+                                            : 'border-gray-600/50 bg-gray-700/20 text-gray-300 hover:border-primary/50 hover:bg-primary/5'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-semibold">{hall.name}</h4>
+                                            <p className="text-sm text-gray-400">Available for scheduling</p>
+                                        </div>
+                                        {selectedHall === hall.name && (
+                                            <CheckIcon className="w-5 h-5 text-primary" />
+                                        )}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
                 <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6">
                     <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                         <DollarSign className="w-5 h-5 text-primary" />
@@ -214,15 +349,26 @@ const AddShows = () => {
                             className="w-full pl-12 pr-4 py-3 bg-gray-700/30 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300"
                         />
                     </div>
+                    {selectedHall && (
+                        <p className="text-gray-400 text-sm mt-2">
+                            Setting price for <span className="text-primary font-medium">{selectedHall}</span>
+                        </p>
+                    )}
                 </div>
             </div>
 
-            {/* Select Date and Time */}
+            {/* ✅ Simple Date and Time Selection - NO SUGGEST */}
             <div className="mb-8">
                 <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6">
                     <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                         <Calendar className="w-5 h-5 text-white" />
                         Select Date and Time
+                        {selectedHall && <span className="text-primary text-sm">({selectedHall})</span>}
+                        {selectedMovie && (
+                            <span className="text-yellow-400 text-sm">
+                                Gap needed: {selectedMovieRuntime + 30} min ({selectedMovieRuntime}min + 30min buffer)
+                            </span>
+                        )}
                     </h3>
                     
                     <div className="flex gap-3 items-end">
@@ -237,12 +383,21 @@ const AddShows = () => {
                         </div>
                         <button 
                             onClick={handleDateTimeAdd}
-                            className="px-6 py-3 bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white font-semibold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30 flex items-center gap-2"
+                            disabled={!selectedHall || !selectedMovie}
+                            className={`px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 shadow-lg flex items-center gap-2 ${
+                                selectedHall && selectedMovie
+                                    ? 'bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white shadow-primary/30'
+                                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                            }`}
                         >
                             <Plus className="w-4 h-4" />
                             Add Time
                         </button>
                     </div>
+                    
+                    {(!selectedHall || !selectedMovie) && (
+                        <p className="text-yellow-400 text-sm mt-2">Please select a movie and hall first</p>
+                    )}
                 </div>
             </div>
 
@@ -253,6 +408,7 @@ const AddShows = () => {
                         <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                             <Clock className="w-5 h-5 text-white" />
                             Selected Date-Time
+                            {selectedHall && <span className="text-primary">({selectedHall})</span>}
                         </h3>
                         
                         <div className="space-y-4">
@@ -267,24 +423,38 @@ const AddShows = () => {
                                         })}
                                     </div>
                                     <div className="flex flex-wrap gap-2">
-                                        {times.map((time) => (
-                                            <div 
-                                                key={time} 
-                                                className="flex items-center gap-2 bg-primary/20 border border-primary/30 text-primary px-3 py-2 rounded-lg"
-                                            >
-                                                <span className="font-medium">
-                                                    {new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true
-                                                    })}
-                                                </span>
-                                                <DeleteIcon 
-                                                    onClick={() => handleRemoveTime(date, time)} 
-                                                    className="w-4 h-4 cursor-pointer text-red-400 hover:text-red-300 transition-colors" 
-                                                />
-                                            </div>
-                                        ))}
+                                        {times.map((time) => {
+                                            const startTime = new Date(`2000-01-01T${time}`)
+                                            const endTime = new Date(startTime.getTime() + selectedMovieRuntime * 60000)
+                                            
+                                            return (
+                                                <div 
+                                                    key={time} 
+                                                    className="flex items-center gap-2 bg-primary/20 border border-primary/30 text-primary px-3 py-2 rounded-lg"
+                                                >
+                                                    <div className="text-center">
+                                                        <div className="font-medium">
+                                                            {startTime.toLocaleTimeString('en-US', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                                hour12: true
+                                                            })}
+                                                        </div>
+                                                        <div className="text-xs text-gray-400">
+                                                            to {endTime.toLocaleTimeString('en-US', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                                hour12: true
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                    <DeleteIcon 
+                                                        onClick={() => handleRemoveTime(date, time)} 
+                                                        className="w-4 h-4 cursor-pointer hover:text-red-400 transition-colors"
+                                                    />
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             ))}
@@ -293,27 +463,20 @@ const AddShows = () => {
                 </div>
             )}
 
-            {/* Add Show Button */}
-            <div className="text-center">
+            {/* Submit Button */}
+            <div className="flex justify-center">
                 <button 
-                    onClick={handleAddShow}
-                    className="px-8 py-4 bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white font-bold text-lg rounded-xl transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={addingShow || !selectedMovie || !showPrice || Object.keys(dateTimeSelection).length === 0}
+                    onClick={handleSubmit}
+                    disabled={!selectedMovie || !showPrice || !selectedHall || Object.keys(dateTimeSelection).length === 0}
+                    className={`px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 ${
+                        selectedMovie && showPrice && selectedHall && Object.keys(dateTimeSelection).length > 0
+                            ? 'bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white shadow-lg shadow-primary/30 hover:scale-105'
+                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    }`}
                 >
-                    {addingShow ? 'Adding Show...' : 'Add Show'}
+                    Add Shows to {selectedHall || 'Cinema'}
                 </button>
             </div>
-
-            {/* ✅ Debug panel để kiểm tra */}
-            {/* {process.env.NODE_ENV === 'development' && (
-                <div className="fixed bottom-4 right-4 bg-gray-900/90 p-3 rounded-lg text-xs border border-gray-700">
-                    <div className="text-green-400">Debug Info:</div>
-                    <div>Selected: {selectedMovie || 'None'}</div>
-                    <div>Price: {showPrice || 'Empty'}</div>
-                    <div>Times: {Object.keys(dateTimeSelection).length}</div>
-                    <div>Valid: {selectedMovie && showPrice && Object.keys(dateTimeSelection).length > 0 ? '✅' : '❌'}</div>
-                </div>
-            )} */}
         </div>
     ) : <Loading />
 }

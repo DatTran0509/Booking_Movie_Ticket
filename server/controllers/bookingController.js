@@ -101,3 +101,4 @@ export const getOccupiedSeats = async (req, res) => {
         
     }
 }
+

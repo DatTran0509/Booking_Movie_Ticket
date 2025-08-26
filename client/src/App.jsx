@@ -17,7 +17,8 @@ import Layout from './pages/admin/Layout'
 import { useAppContext } from './context/AppContext'
 import { SignIn } from '@clerk/clerk-react'
 import Loading from './components/Loading'  
-
+import ControlPanel from './pages/admin/ControlPanel'
+import Theaters from './pages/Theaters'
 const App = () => {
   const isAdminRoute = useLocation().pathname.startsWith('/admin');
   const {user} = useAppContext();
@@ -33,6 +34,7 @@ const App = () => {
         <Route path="/movies/:id/:date" element={<SeatLayout />} />
         <Route path='/my-bookings' element={<MyBookings />} />
         <Route path='/loading/:nextUrl' element={<Loading />} />
+        <Route path='/theaters' element={<Theaters />} />
         <Route path="/favorite" element={<Favorite />} />
 
         <Route path='/admin/*' element={user ? <Layout />: (
@@ -44,6 +46,7 @@ const App = () => {
           <Route path='add-shows' element={<AddShows />} />
           <Route path='list-bookings' element={<ListBookings />} />
           <Route path='list-shows' element={<ListShows />} />
+          <Route path='control-panel' element={<ControlPanel />} />
         </Route>
         {/* Add more routes as needed */}
       </Routes>

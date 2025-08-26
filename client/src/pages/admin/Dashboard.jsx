@@ -1,39 +1,91 @@
-import { ChartLineIcon, CircleDollarSignIcon, PlayCircleIcon, StarIcon, UsersIcon } from 'lucide-react'
+import { ChartLineIcon, CircleDollarSignIcon, PlayCircleIcon, StarIcon, CalendarIcon, TrendingUpIcon } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
-import { dummyDashboardData } from '../../assets/assets'
 import Loading from '../../components/Loading'
 import Title from '../../components/admin/Title'
-import { dateFormat } from '../../lib/dateFormat'
 import BlurCircle from '../../components/BlurCircle'
 import { useAppContext } from '../../context/AppContext'
 import toast from 'react-hot-toast'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title as ChartTitle,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from 'chart.js'
+import { Line, Bar, Doughnut } from 'react-chartjs-2'
+import HallSettings from '../../components/admin/HallSettings'
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ChartTitle,
+  Tooltip,
+  Legend,
+  ArcElement
+)
+
 const Dashboard = () => {
-  const {axios, getToken, user, image_base_url} = useAppContext()
+  const {axios, getToken, user} = useAppContext()
   const currency = import.meta.env.VITE_CURRENCY
-  const [bookings, setBookings] = useState([])
 
   const [dashboardData, setDashboardData] = useState({
     totalBookings: 0,
     totalRevenue: 0,
-    activeShows: [],
-    totalUsers: 0
+    activeShows: 0,
+    monthlyData: [],
+    yearlyData: []
   })
 
   const [loading, setLoading] = useState(true)
+  const [chartPeriod, setChartPeriod] = useState('monthly') // 'monthly' or 'yearly'
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
 
   const dashboardCard = [
-    { title: 'Total Bookings', value: dashboardData.totalBookings || '0', icon: ChartLineIcon },
-    { title: 'Total Revenue', value: `${currency} ${dashboardData.totalRevenue || '0'}`, icon: CircleDollarSignIcon },
-    { title: "Active Shows", value: dashboardData.activeShows.length || '0', icon: PlayCircleIcon },
-    { title: 'Total Users', value: dashboardData.totalUsers || '0', icon: UsersIcon }
+    { 
+      title: 'Total Bookings', 
+      value: dashboardData.totalBookings || '0', 
+      icon: ChartLineIcon,
+      cardStyle: 'bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500/30',
+      titleColor: 'text-blue-400',
+      iconStyle: 'bg-blue-500/20',
+      iconColor: 'text-blue-400'
+    },
+    { 
+      title: 'Total Revenue', 
+      value: `${currency}${dashboardData.totalRevenue || '0'}`, 
+      icon: CircleDollarSignIcon,
+      cardStyle: 'bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30',
+      titleColor: 'text-green-400',
+      iconStyle: 'bg-green-500/20',
+      iconColor: 'text-green-400'
+    },
+    { 
+      title: "Active Shows", 
+      value: dashboardData.activeShows || '0', 
+      icon: PlayCircleIcon,
+      cardStyle: 'bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-purple-500/30',
+      titleColor: 'text-purple-400',
+      iconStyle: 'bg-purple-500/20',
+      iconColor: 'text-purple-400'
+    }
   ]
 
   const fetchDashboardData = async () => {
     try {
-      const {data} = await axios.get('/api/admin/dashboard', {
-        headers: { Authorization: `Bearer ${await getToken()}`}
+      const {data} = await axios.get('/api/admin/dashboard-revenue', {
+        headers: { Authorization: `Bearer ${await getToken()}`},
+        params: { year: selectedYear }
       })
-
+      console.log('Dashboard Data:', data.dashboardData)
       if (data.success) {
         setDashboardData(data.dashboardData)
         setLoading(false)
@@ -41,15 +93,141 @@ const Dashboard = () => {
         toast.error(data.message)
       }
     } catch (error) {
-      toast.error('Error fetching dashboard data', error)
+      console.error('Error fetching dashboard data:', error)
+      toast.error('Error fetching dashboard data')
     }
   }
 
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
+    if (user) {
+      fetchDashboardData()
+    }
+  }, [user, selectedYear])
 
-  console.log('Dashboard Data:', dashboardData)
+  // ✅ Prepare chart data
+  const getChartData = () => {
+    if (chartPeriod === 'monthly') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      
+      return {
+        labels: months,
+        datasets: [
+          {
+            label: 'Total Bookings',
+            data: dashboardData.monthlyData?.map(m => m.totalBookings) || new Array(12).fill(0),
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.4,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Revenue',
+            data: dashboardData.monthlyData?.map(m => m.totalRevenue) || new Array(12).fill(0),
+            borderColor: 'rgb(34, 197, 94)',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            tension: 0.4,
+            yAxisID: 'y1'
+          }
+        ]
+      }
+    } else {
+      const currentYear = new Date().getFullYear()
+      const years = Array.from({length: 5}, (_, i) => currentYear - 4 + i)
+      
+      return {
+        labels: years,
+        datasets: [
+          {
+            label: 'Total Bookings',
+            data: dashboardData.yearlyData?.map(y => y.totalBookings) || new Array(5).fill(0),
+            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+          },
+          {
+            label: 'Revenue',
+            data: dashboardData.yearlyData?.map(y => y.totalRevenue) || new Array(5).fill(0),
+            backgroundColor: 'rgba(34, 197, 94, 0.8)',
+          }
+        ]
+      }
+    }
+  }
+
+  // ✅ Chart options
+  const chartOptions = {
+    responsive: true,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: {
+          color: 'white',
+          font: {
+            size: 12
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: 'white',
+        bodyColor: 'white',
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderWidth: 1
+      }
+    },
+    scales: chartPeriod === 'monthly' ? {
+      x: {
+        ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+      },
+      y: {
+        type: 'linear',
+        display: true,
+        position: 'left',
+        ticks: { color: 'rgba(59, 130, 246, 0.8)' },
+        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+      },
+      y1: {
+        type: 'linear',
+        display: true,
+        position: 'right',
+        ticks: { color: 'rgba(34, 197, 94, 0.8)' },
+        grid: { drawOnChartArea: false }
+      }
+    } : {
+      x: {
+        ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+      },
+      y: {
+        ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+      }
+    }
+  }
+
+  // ✅ Revenue distribution data
+  const getRevenueDistribution = () => {
+    const currentMonthData = dashboardData.monthlyData?.[new Date().getMonth()] || { paidRevenue: 0, pendingRevenue: 0 }
+    
+    return {
+      labels: ['Paid Revenue', 'Pending Revenue'],
+      datasets: [{
+        data: [currentMonthData.paidRevenue || 0, currentMonthData.pendingRevenue || 0],
+        backgroundColor: [
+          'rgba(34, 197, 94, 0.8)',
+          'rgba(251, 191, 36, 0.8)'
+        ],
+        borderColor: [
+          'rgb(34, 197, 94)',
+          'rgb(251, 191, 36)'
+        ],
+        borderWidth: 2
+      }]
+    }
+  }
 
   return !loading ? (
     <div className="min-h-screen bg-black text-white p-6 relative">
@@ -60,139 +238,201 @@ const Dashboard = () => {
       {/* Header */}
       <div className="mb-8">
         <Title text1='Admin' text2='Dashboard' />
+        <p className="text-gray-400 mt-2">Revenue analytics and performance overview</p>
       </div>
 
       {/* Dashboard Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         {dashboardCard.map((card, index) => (
           <div 
             key={index}
-            className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 hover:border-primary/30 transition-all duration-300 hover:scale-105 group"
+            className={`${card.cardStyle} backdrop-blur-sm border rounded-xl p-4 hover:scale-105 transition-all duration-300 group`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <h3 className="text-gray-400 text-sm font-medium mb-2 group-hover:text-gray-300 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 ${card.iconStyle} rounded-lg flex items-center justify-center`}>
+                <card.icon className={`w-5 h-5 ${card.iconColor}`} />
+              </div>
+              <div>
+                <p className={`${card.titleColor} font-semibold text-sm`}>
                   {card.title}
-                </h3>
-                <p className="text-2xl font-bold text-white group-hover:text-primary transition-colors">
+                </p>
+                <p className="text-2xl font-bold text-white">
                   {card.value}
                 </p>
-              </div>
-              <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center group-hover:bg-primary/30 transition-colors">
-                <card.icon className="w-6 h-6 text-primary" />
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Active Shows Section */}
-      <div className="relative">
-        <BlurCircle top='100px' left='0'/>
-        
-        {/* Section Header */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-white mb-2">Active Movies</h2>
-          <div className="w-20 h-1 bg-primary rounded-full"></div>
-        </div>
-
-        {/* Movies Grid - Updated to 4 columns */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {dashboardData.activeShows.map((show, index) => (
-            <div 
-              key={index}
-              className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl overflow-hidden hover:border-primary/30 transition-all duration-300 hover:scale-105 group"
-            >
-              {/* Movie Poster */}
-              <div className="relative overflow-hidden">
-                <img 
-                  src={image_base_url + show.movie.poster_path} 
-                  alt={show.movie.title}
-                  className="w-full h-60 object-cover group-hover:scale-110 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                
-                {/* Status Badge */}
-                <div className="absolute top-3 right-3">
-                  <div className="bg-green-500/90 text-white text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm">
-                    ACTIVE
-                  </div>
-                </div>
+      {/* ✅ Revenue Analytics Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-12">
+        {/* Main Chart */}
+        <div className="xl:col-span-2">
+          <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6">
+            {/* Chart Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <TrendingUpIcon className="w-6 h-6 text-blue-400" />
+                <h3 className="text-xl font-bold text-white">Revenue Analytics</h3>
               </div>
-
-              {/* Movie Info */}
-              <div className="p-4">
-                {/* Title */}
-                <h3 className="text-base font-bold text-white mb-2 line-clamp-2 group-hover:text-primary transition-colors">
-                  {show.movie.title}
-                </h3>
-
-                {/* Price & Rating */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-primary">
-                      {currency}{show.showPrice}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 bg-yellow-500/20 px-2 py-1 rounded-lg">
-                    <StarIcon className="w-3 h-3 text-yellow-500 fill-current" />
-                    <span className="text-yellow-500 font-semibold text-xs">
-                      {show.movie.vote_average.toFixed(1)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Show Date */}
-                <div className="flex items-center gap-2 text-gray-400 text-xs">
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
-                  <span>{dateFormat(show.showDateTime)}</span>
-                </div>
-
-                {/* Additional Info */}
-                <div className="mt-3 pt-3 border-t border-gray-700/30">
-                  <div className="space-y-2">
-                    {/* Duration */}
-                    <div className="text-xs text-gray-400">
-                      Duration: {show.movie.runtime || '120'} min
-                    </div>
-                    
-                    {/* Genres */}
-                    <div className="flex flex-wrap gap-1">
-                      {show.movie.genres?.length > 0 ? (
-                        show.movie.genres.slice(0, 3).map((genre, genreIndex) => (
-                          <span 
-                            key={genreIndex}
-                            className="bg-primary/20 text-primary px-2 py-1 rounded-full text-xs"
-                          >
-                            {genre.name}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="bg-gray-700/50 text-gray-400 px-2 py-1 rounded-full text-xs">
-                          No Genres
-                        </span>
-                      )}
-                      {show.movie.genres?.length > 3 && (
-                        <span className="bg-gray-700/50 text-gray-400 px-2 py-1 rounded-full text-xs">
-                          +{show.movie.genres.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+              
+              {/* Controls */}
+              <div className="flex items-center gap-4">
+                {/* Year Selector */}
+                <select 
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="bg-gray-700/50 border border-gray-600/50 rounded-lg px-3 py-1 text-white text-sm"
+                >
+                  {Array.from({length: 5}, (_, i) => new Date().getFullYear() - 4 + i).map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+                
+                {/* Period Toggle */}
+                <div className="flex bg-gray-700/30 rounded-lg p-1">
+                  <button
+                    onClick={() => setChartPeriod('monthly')}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      chartPeriod === 'monthly' 
+                        ? 'bg-blue-500 text-white' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setChartPeriod('yearly')}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      chartPeriod === 'yearly' 
+                        ? 'bg-blue-500 text-white' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Yearly
+                  </button>
                 </div>
               </div>
             </div>
-          ))}
+
+            {/* Chart */}
+            <div className="h-80">
+              {chartPeriod === 'monthly' ? (
+                <Line data={getChartData()} options={chartOptions} />
+              ) : (
+                <Bar data={getChartData()} options={chartOptions} />
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Show More Button */}
-        {dashboardData.activeShows.length > 8 && (
-          <div className="text-center mt-8">
-            <button className="px-6 py-3 bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary text-white font-semibold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg shadow-primary/30">
-              View All Movies ({dashboardData.activeShows.length})
-            </button>
+        {/* Revenue Distribution */}
+        <div className="space-y-6">
+          {/* Current Month Revenue Split */}
+          <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <CircleDollarSignIcon className="w-5 h-5 text-green-400" />
+              <h4 className="text-lg font-semibold text-white">Revenue Split</h4>
+            </div>
+            
+            <div className="h-48 mb-4">
+              <Doughnut 
+                data={getRevenueDistribution()} 
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'bottom',
+                      labels: {
+                        color: 'white',
+                        font: { size: 10 }
+                      }
+                    }
+                  }
+                }}
+              />
+            </div>
           </div>
-        )}
+
+          {/* Quick Stats */}
+          <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <StarIcon className="w-5 h-5 text-yellow-400" />
+              <h4 className="text-lg font-semibold text-white">Quick Stats</h4>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-sm">This Month</span>
+                <span className="text-green-400 font-semibold">
+                  {currency}{dashboardData.monthlyData?.[new Date().getMonth()]?.totalRevenue || 0}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-sm">Last Month</span>
+                <span className="text-gray-300 font-semibold">
+                  {currency}{dashboardData.monthlyData?.[new Date().getMonth() - 1]?.totalRevenue || 0}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center pt-2 border-t border-gray-600/30">
+                <span className="text-gray-400 text-sm">Average/Month</span>
+                <span className="text-blue-400 font-semibold">
+                  {currency}{dashboardData.monthlyData?.length > 0 
+                    ? Math.round(dashboardData.monthlyData.reduce((sum, m) => sum + m.totalRevenue, 0) / dashboardData.monthlyData.length)
+                    : 0
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ✅ Monthly Breakdown Table */}
+      <div className="bg-gradient-to-br from-gray-800/40 to-gray-900/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl overflow-hidden">
+        <div className="bg-gradient-to-r from-primary/20 to-primary/10 border-b border-gray-700/50 p-6">
+          <div className="flex items-center gap-3">
+            <CalendarIcon className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold text-white">Monthly Breakdown {selectedYear}</h3>
+          </div>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-800/30">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Month</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Bookings</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Paid Revenue</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Pending Revenue</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Revenue</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700/30">
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, index) => {
+                const monthData = dashboardData.monthlyData?.[index] || { totalBookings: 0, paidRevenue: 0, pendingRevenue: 0, totalRevenue: 0 }
+                return (
+                  <tr key={month} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{month}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-400">{monthData.totalBookings}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-400">{currency}{monthData.paidRevenue}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-400">{currency}{monthData.pendingRevenue}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-white">{currency}{monthData.totalRevenue}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ✅ Hall Settings Section */}
+      <div className="mb-12">
+        <HallSettings />
       </div>
     </div>
   ) : <Loading />

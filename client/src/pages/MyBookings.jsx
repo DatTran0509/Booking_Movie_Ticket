@@ -103,6 +103,7 @@ const MyBookings = () => {
         {/* Bookings List */}
         <div className='max-w-4xl mx-auto space-y-6'>
           {bookings.map((item, index) => {
+            console.log(item)
             const dateTime = formatDateTime(item.show.showDateTime)
             
             return (
@@ -164,7 +165,7 @@ const MyBookings = () => {
                         </div>
                         <div className='flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10'>
                           <MapPin className='w-4 h-4 text-primary' />
-                          <span className='text-sm font-medium'>Cinema Hall 1</span>
+                          <span className='text-sm font-medium'>{item.show.hall}</span>
                         </div>
                       </div>
 

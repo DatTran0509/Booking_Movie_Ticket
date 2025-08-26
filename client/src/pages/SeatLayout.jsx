@@ -45,16 +45,18 @@ const customStyles = `
 `
 
 const SeatLayout = () => {
-  const {axios, getToken, user, image_base_url} = useAppContext()
+  const { axios, getToken, user, image_base_url } = useAppContext()
   const { id, date } = useParams()
   const navigate = useNavigate()
- 
+
   const [selectedSeats, setSelectedSeats] = useState([])
   const [selectedTime, setSelectedTime] = useState(null)
+  const [selectedHall, setSelectedHall] = useState('') // ✅ Add hall selection state
   const [show, setShow] = useState(null)
   const [isVisible, setIsVisible] = useState(false)
   const [occupiedSeats, setOccupiedSeats] = useState([])
   const [showPrice, setShowPrice] = useState(0)
+  const [priceLoading, setPriceLoading] = useState(false)
 
   // Seat configuration với pricing tiers
   const seatRows = [
@@ -73,13 +75,9 @@ const SeatLayout = () => {
   // Mock occupied seats
   const getShow = async () => {
     try {
-      const {data} = await axios.get(`/api/show/${id}`)
+      const { data } = await axios.get(`/api/show/${id}`)
       if (data.success) {
         setShow(data)
-        // ✅ REMOVE auto time selection - let customer choose
-        // if (!selectedTime && data.dateTime[date]?.length > 0) {
-        //   setSelectedTime(data.dateTime[date][0])
-        // }
       }
 
     } catch (error) {
@@ -88,10 +86,10 @@ const SeatLayout = () => {
   }
   const getOccupiedSeats = async () => {
     try {
-      const {data} = await axios.get(`/api/booking/seats/${selectedTime.showId}`)
+      const { data } = await axios.get(`/api/booking/seats/${selectedTime.showId}`)
       if (data.success) {
         setOccupiedSeats(data.occupiedSeats)
-      }else {
+      } else {
         toast.error(data.message)
       }
     } catch (error) {
@@ -101,11 +99,11 @@ const SeatLayout = () => {
   const getShowPrice = async () => {
     try {
       if (!selectedTime?.showId) return;
-      
-      const {data} = await axios.get(`/api/show/showprice/${selectedTime.showId}`, {
+
+      const { data } = await axios.get(`/api/show/showprice/${selectedTime.showId}`, {
         headers: { Authorization: `Bearer ${await getToken()}` }
       })
-      
+
       if (data.success) {
         setShowPrice(data.showPrice)
       } else {
@@ -116,26 +114,17 @@ const SeatLayout = () => {
       toast.error('Failed to fetch show price')
     }
   }
-  
+
   const bookTickets = async () => {
     try {
-      if(!user) return toast.error('Please login to book tickets')
-      const {data} = await axios.post('/api/booking/create', {showId: selectedTime.showId, selectedSeats: selectedSeats}, {
+      if (!user) return toast.error('Please login to book tickets')
+      const { data } = await axios.post('/api/booking/create', { showId: selectedTime.showId, selectedSeats: selectedSeats }, {
         headers: { Authorization: `Bearer ${await getToken()}` }
       })
       if (data.success) {
-        // toast.success('Tickets booked successfully!', {
-        //   icon: '🎟️',
-        //   style: {
-        //     background: '#1a1a1a',
-        //     color: '#fff',
-        //     border: '1px solid #10b981'
-        //   }
-        // })
-        console.log(data.url)
         window.location.href = data.url
-        
-      }else{
+
+      } else {
         toast.error(data.message)
       }
     } catch (error) {
@@ -203,9 +192,9 @@ const SeatLayout = () => {
       })
     }
 
-    setSelectedSeats(prev => 
-      prev.includes(seatId) 
-        ? prev.filter(seat => seat !== seatId) 
+    setSelectedSeats(prev =>
+      prev.includes(seatId)
+        ? prev.filter(seat => seat !== seatId)
         : [...prev, seatId]
     )
 
@@ -230,9 +219,46 @@ const SeatLayout = () => {
     }
   }
 
+  // ✅ Add function to get unique halls from show data
+  const getAvailableHalls = () => {
+    if (!show?.dateTime?.[date]) return []
+    const halls = new Set()
+    show.dateTime[date].forEach(item => {
+      halls.add(item.hall)
+    })
+
+    return Array.from(halls).sort()
+  }
+
+  // ✅ Add function to get filtered times based on selected hall
+  const getFilteredTimes = () => {
+    if (!show?.dateTime?.[date]) return []
+
+    if (!selectedHall) return show.dateTime[date]
+
+    return show.dateTime[date].filter(item => item.hall === selectedHall)
+  }
+
+  // ✅ Add hall selection handler
+  const handleHallSelect = (hall) => {
+    setSelectedHall(hall)
+    setSelectedTime(null) // Reset time selection when hall changes
+    setSelectedSeats([]) // Reset seats when hall changes
+    setShowPrice(0)
+
+    toast.success(`${hall} selected`, {
+      icon: '🏟️',
+      style: {
+        background: '#1a1a1a',
+        color: '#fff',
+        border: '1px solid #6366f1'
+      }
+    })
+  }
+
   const handleTimeSelect = (time) => {
     setSelectedTime(time)
-    toast.success(`${isoTimeFormat(time.time)} selected`, {
+    toast.success(`${isoTimeFormat(time.time)} - ${time.hall} selected`, {
       icon: '🎬',
       style: {
         background: '#1a1a1a',
@@ -255,7 +281,7 @@ const SeatLayout = () => {
   // ✅ Update getSeatStyles - remove animate-pulse, sẽ dùng custom class
   const getSeatStyles = (status, rowType) => {
     const baseStyles = 'w-8 h-8 rounded-lg border-2 text-xs font-bold transition-all duration-300 transform relative overflow-hidden'
-    
+
     switch (status) {
       case 'selected':
         // ✅ Thêm sync-pulse class thay vì animate-pulse
@@ -277,11 +303,11 @@ const SeatLayout = () => {
   const renderSeatRow = (rowData) => {
     const { row, count, type } = rowData // Remove price from destructuring
     const seats = []
-    
+
     for (let i = 1; i <= count; i++) {
       const seatId = `${row}${i}`
       const status = getSeatStatus(seatId)
-      
+
       // Add gaps based on seat configuration
       if (count === 9 && i === 5) {
         seats.push(
@@ -298,7 +324,7 @@ const SeatLayout = () => {
           )
         }
       }
-      
+
       seats.push(
         <div key={seatId} className="relative group">
           <button
@@ -308,7 +334,7 @@ const SeatLayout = () => {
           >
             {/* Seat number */}
             <span className="relative z-10">{i}</span>
-            
+
             {/* ✅ Sync glow effects */}
             {status === 'selected' && (
               <>
@@ -317,7 +343,7 @@ const SeatLayout = () => {
                 <div className="absolute -inset-2 bg-green-300/10 rounded-lg blur-xl sync-glow"></div>
               </>
             )}
-            
+
             {/* ✅ Updated tooltip với showPrice */}
             {status !== 'occupied' && (
               <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black/90 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none whitespace-nowrap z-20">
@@ -357,74 +383,165 @@ const SeatLayout = () => {
     <div className="min-h-screen bg-black relative overflow-hidden">
       {/* ✅ Inject custom styles */}
       <style>{customStyles}</style>
-      
+
       {/* Enhanced Background Effects */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5"></div>
       <BlurCircle top="-100px" left="-100px" />
       <BlurCircle bottom="-100px" right="-100px" />
-      
+
       {/* Floating Elements */}
       <div className="absolute top-20 right-20 w-3 h-3 bg-primary/60 rounded-full animate-bounce duration-[3000ms]"></div>
       <div className="absolute bottom-40 left-20 w-2 h-2 bg-yellow-500/40 rounded-full animate-ping duration-[4000ms] delay-1000"></div>
       <div className="absolute top-1/2 right-10 w-2 h-2 bg-green-500/50 rounded-full animate-pulse duration-[5000ms] delay-2000"></div>
-      
-      
+
+
       <div className="relative z-10 flex flex-col lg:flex-row gap-8 p-6 md:p-12 lg:p-16 xl:p-20">
-        
+
         {/* Enhanced Left Sidebar */}
-        <div className={`lg:w-96 transition-all duration-1000 ${
-          isVisible ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0'
-        }`}>
+        <div className={`lg:w-96 transition-all duration-1000 ${isVisible ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0'
+          }`}>
           <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 p-8 lg:sticky lg:top-20 shadow-2xl">
-            {/* Header */}
+            
+            {/* ✅ Step 1: Date Selection Header */}
             <div className="flex items-center gap-4 mb-8">
               <div className="w-12 h-12 bg-gradient-to-br from-primary/30 to-primary/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                <ClockIcon className="w-6 h-6 text-primary" />
+                <Calendar className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-white mb-1">Available Timings</h3>
-                <p className="text-gray-400 text-sm flex items-center gap-2">
+                <h3 className="text-2xl font-bold text-white mb-1">Selected Date</h3>
+                <p className="text-primary text-sm flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  {new Date(date).toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    month: 'long', 
-                    day: 'numeric' 
+                  {new Date(date).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric'
                   })}
                 </p>
               </div>
             </div>
 
-            {/* Time Slots */}
-            <div className="space-y-3 mb-8">
-              {show.dateTime[date]?.map((item, index) => (
-                <button
-                  key={item.time}
-                  onClick={() => handleTimeSelect(item)}
-                  className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all duration-300 group ${
-                    selectedTime?.time === item.time
-                      ? 'bg-gradient-to-r from-primary to-primary-dull text-white shadow-lg shadow-primary/30 scale-105'
-                      : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 hover:border-primary/30 hover:scale-102'
-                  }`}
-                  style={{
-                    animationDelay: `${index * 100}ms`
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <ClockIcon className="w-5 h-5" />
-                    <span className="font-bold text-lg">{isoTimeFormat(item.time)}</span>
+            {/* ✅ Step 2: Hall Selection (Second) */}
+            <div className="mb-8">
+              <h4 className="text-white font-semibold mb-4 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-primary" />
+                Step 1: Select Cinema Hall
+              </h4>
+
+              <div className="grid grid-cols-1 gap-3">
+                {getAvailableHalls().map((hall, index) => (
+                  <button
+                    key={hall}
+                    onClick={() => handleHallSelect(hall)}
+                    className={`p-4 rounded-xl border transition-all duration-300 text-left ${
+                      selectedHall === hall
+                        ? 'border-primary bg-primary/10 text-white shadow-lg shadow-primary/20'
+                        : 'border-gray-600/50 bg-gray-700/20 text-gray-300 hover:border-primary/50 hover:bg-primary/5'
+                    }`}
+                    style={{
+                      animationDelay: `${index * 50}ms`
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-4 h-4" />
+                        <div>
+                          <h5 className="font-semibold">{hall}</h5>
+                          <p className="text-sm opacity-70">
+                            {show.dateTime[date].filter(item => item.hall === hall).length} shows available
+                          </p>
+                        </div>
+                      </div>
+                      {selectedHall === hall && (
+                        <div className="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Progress indicator */}
+              {selectedHall && (
+                <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-green-400 text-sm">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>Hall selected: {selectedHall}</span>
                   </div>
-                  {selectedTime?.time === item.time && (
-                    <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                </div>
+              )}
+            </div>
+
+            {/* ✅ Step 3: Time Selection (Third) */}
+            <div className="mb-8">
+              <h4 className="text-white font-semibold mb-4 flex items-center gap-2">
+                <ClockIcon className="w-5 h-5 text-primary" />
+                Step 2: Select Show Time
+                {selectedHall && <span className="text-primary text-sm">({selectedHall})</span>}
+              </h4>
+
+              {!selectedHall ? (
+                <div className="text-center py-8 bg-gray-700/20 rounded-xl border border-gray-600/30">
+                  <ClockIcon className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400 mb-2">Please select a hall first</p>
+                  <p className="text-sm text-gray-500">
+                    Step 1: Choose from {getAvailableHalls().length} available halls above
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {getFilteredTimes().map((item, index) => (
+                    <button
+                      key={`${item.time}-${item.hall}`}
+                      onClick={() => handleTimeSelect(item)}
+                      className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all duration-300 group ${
+                        selectedTime?.showId === item.showId
+                          ? 'bg-gradient-to-r from-primary to-primary-dull text-white shadow-lg shadow-primary/30 scale-105'
+                          : 'bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 hover:border-primary/30 hover:scale-102'
+                      }`}
+                      style={{
+                        animationDelay: `${index * 100}ms`
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <ClockIcon className="w-5 h-5" />
+                        <div className="text-left">
+                          <div className="font-bold text-lg">{isoTimeFormat(item.time)}</div>
+                
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-primary">${item.price}</div>
+                        {selectedTime?.showId === item.showId && (
+                          <div className="w-3 h-3 bg-white rounded-full animate-pulse mt-1 ml-auto"></div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+
+                  {getFilteredTimes().length === 0 && (
+                    <div className="text-center py-8">
+                      <ClockIcon className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                      <p className="text-gray-400">No shows available for {selectedHall}</p>
+                    </div>
                   )}
-                </button>
-              ))}
+                </div>
+              )}
+
+              {/* Progress indicator */}
+              {selectedTime && (
+                <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-green-400 text-sm">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>Show time selected: {isoTimeFormat(selectedTime.time)}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Enhanced Movie Info */}
             <div className="p-6 bg-gradient-to-br from-white/10 to-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
               <div className="flex items-start gap-4">
-                <img 
-                  src={image_base_url + show.movie.poster_path} 
+                <img
+                  src={image_base_url + show.movie.poster_path}
                   alt={show.movie.title}
                   className="w-16 h-24 rounded-lg object-cover border border-white/20"
                 />
@@ -435,33 +552,60 @@ const SeatLayout = () => {
                       <Star className="w-4 h-4 fill-current" />
                       <span className="font-medium">{show.movie.vote_average.toFixed(1)}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-400">
-                      <MapPin className="w-4 h-4" />
-                      <span>Cinema Hall 1</span>
+                    
+                    {/* ✅ Show progress steps */}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        <span className="text-primary font-medium">
+                          {new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <MapPin className={`w-4 h-4 ${selectedHall ? 'text-green-400' : 'text-gray-400'}`} />
+                        <span className={selectedHall ? 'text-green-400 font-medium' : 'text-gray-400'}>
+                          {selectedHall || 'Select hall'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <ClockIcon className={`w-4 h-4 ${selectedTime ? 'text-green-400' : 'text-gray-400'}`} />
+                        <span className={selectedTime ? 'text-green-400 font-medium' : 'text-gray-400'}>
+                          {selectedTime ? isoTimeFormat(selectedTime.time) : 'Select time'}
+                        </span>
+                      </div>
                     </div>
+                    
                     <p className="text-gray-400">{timeFormat(show.movie.runtime)}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Pricing Info */}
+            {/* ✅ Enhanced Pricing Info */}
             <div className="mt-6 space-y-3">
               <h5 className="text-white font-semibold mb-3">Seat Pricing</h5>
               <div className="space-y-2 text-sm">
                 {selectedTime ? (
                   <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
                     <div className="text-primary text-2xl font-bold mb-1">
-                      ${showPrice}
+                      {priceLoading ? (
+                        <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                      ) : (
+                        `$${showPrice}`
+                      )}
                     </div>
                     <div className="text-gray-400 text-sm">
-                      All Seats • Same Price
+                      All Seats • {selectedTime.hall}
                     </div>
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-                    <span className="text-gray-400 text-sm">Please Choose Time</span>
+                    <div className="w-6 h-6 border-2 border-gray-600 border-t-transparent rounded-full mx-auto mb-2 animate-spin"></div>
+                    <span className="text-gray-400 text-sm">
+                      {!selectedHall ? 'Step 1: Choose Hall' : 'Step 2: Choose Show Time'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -470,15 +614,51 @@ const SeatLayout = () => {
         </div>
 
         {/* Enhanced Right Section */}
-        <div className={`flex-1 transition-all duration-1000 delay-300 ${
-          isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
-        }`}>
+        <div className={`flex-1 transition-all duration-1000 delay-300 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+          }`}>
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent">
               Select Your Seat
             </h1>
             <p className="text-gray-400 text-lg">Choose your preferred seats for the best cinema experience</p>
+            
+            {/* ✅ Progress indicator */}
+            <div className="mt-6 flex justify-center">
+              <div className="flex items-center gap-4 bg-white/5 backdrop-blur-sm rounded-2xl px-6 py-3 border border-white/10">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-primary rounded-full"></div>
+                  <span className="text-primary text-sm font-medium">Date Selected</span>
+                </div>
+                
+                <div className="w-px h-4 bg-gray-600"></div>
+                
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${selectedHall ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+                  <span className={`text-sm font-medium ${selectedHall ? 'text-green-400' : 'text-gray-400'}`}>
+                    Hall {selectedHall ? '✓' : ''}
+                  </span>
+                </div>
+                
+                <div className="w-px h-4 bg-gray-600"></div>
+                
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${selectedTime ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+                  <span className={`text-sm font-medium ${selectedTime ? 'text-green-400' : 'text-gray-400'}`}>
+                    Time {selectedTime ? '✓' : ''}
+                  </span>
+                </div>
+                
+                <div className="w-px h-4 bg-gray-600"></div>
+                
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${selectedSeats.length > 0 ? 'bg-green-400' : 'bg-gray-600'}`}></div>
+                  <span className={`text-sm font-medium ${selectedSeats.length > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+                    Seats {selectedSeats.length > 0 ? `(${selectedSeats.length})` : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Enhanced Screen */}
@@ -561,7 +741,7 @@ const SeatLayout = () => {
                   <p className="text-3xl font-bold text-white">${calculateTotal()}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3 mb-6">
                 <span className="text-gray-400 font-medium">Selected Seats:</span>
                 <div className="flex gap-2 flex-wrap">
@@ -574,7 +754,7 @@ const SeatLayout = () => {
                 </div>
               </div>
 
-              <button 
+              <button
                 disabled={!selectedTime || selectedSeats.length === 0}
                 onClick={bookTickets}
                 className="w-full bg-gradient-to-r from-primary to-primary-dull hover:from-primary-dull hover:to-primary disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-bold py-6 rounded-2xl transition-all duration-300 hover:scale-105 disabled:hover:scale-100 shadow-lg shadow-primary/30 hover:shadow-2xl hover:shadow-primary/50 disabled:shadow-none flex items-center justify-center gap-3 text-lg relative overflow-hidden group"
