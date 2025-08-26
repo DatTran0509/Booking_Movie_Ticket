@@ -3,11 +3,12 @@ import BlurCircle from './BlurCircle'
 import { ChevronLeftIcon, ChevronRightIcon, Calendar, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+
 const DateSelect = ({ dateTime, id }) => {
   const [selectedDate, setSelectedDate] = useState(null)
   const [isVisible, setIsVisible] = useState(false)
   const [currentWeek, setCurrentWeek] = useState(0)
-  const navigate =useNavigate()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -16,8 +17,11 @@ const DateSelect = ({ dateTime, id }) => {
     return () => clearTimeout(timer)
   }, [])
 
-  // Get dates array and group by weeks
-  const dates = Object.keys(dateTime)
+  // ✅ Sort dates chronologically
+  const dates = Object.keys(dateTime).sort((a, b) => {
+    return new Date(a) - new Date(b)
+  })
+  
   const datesPerWeek = 7
   const totalWeeks = Math.ceil(dates.length / datesPerWeek)
   
@@ -57,6 +61,15 @@ const DateSelect = ({ dateTime, id }) => {
     return today.toDateString() === date.toDateString()
   }
 
+  // ✅ Check if date is in the past
+  const isPastDate = (dateString) => {
+    const today = new Date()
+    const date = new Date(dateString)
+    today.setHours(0, 0, 0, 0)
+    date.setHours(0, 0, 0, 0)
+    return date < today
+  }
+
   const onBookHandler = () => {
     if(!selectedDate) {
         return toast.error("Please select a date first")
@@ -64,9 +77,6 @@ const DateSelect = ({ dateTime, id }) => {
     navigate(`/movies/${id}/${selectedDate}`)
     scrollTo(0, 0)
   }
-
-  
-
 
   return (
     <div id='date-select' className='pt-16 pb-8'>
@@ -121,13 +131,17 @@ const DateSelect = ({ dateTime, id }) => {
                     const dateInfo = formatDate(date)
                     const isSelected = selectedDate === date
                     const todayDate = isToday(date)
+                    const pastDate = isPastDate(date)
                     
                     return (
                       <button
                         key={date}
-                        onClick={() => handleDateSelect(date)}
+                        onClick={() => !pastDate && handleDateSelect(date)}
+                        disabled={pastDate}
                         className={`group relative h-16 w-full rounded-xl transition-all duration-300 hover:scale-105 ${
-                          isSelected
+                          pastDate
+                            ? 'bg-gray-800/30 border border-gray-700/50 text-gray-600 cursor-not-allowed opacity-50'
+                            : isSelected
                             ? 'bg-gradient-to-br from-primary to-primary-dull text-white shadow-lg shadow-primary/30'
                             : todayDate
                             ? 'bg-white/15 border-2 border-primary/50 text-white hover:bg-white/20'
@@ -144,25 +158,32 @@ const DateSelect = ({ dateTime, id }) => {
                         
                         <div className='relative z-10 flex flex-col items-center justify-center h-full'>
                           <span className={`text-xs font-medium mb-1 ${
-                            isSelected ? 'text-white' : 'text-gray-300'
+                            pastDate ? 'text-gray-600' : isSelected ? 'text-white' : 'text-gray-300'
                           }`}>
                             {dateInfo.weekday}
                           </span>
                           <span className={`text-lg font-bold ${
-                            isSelected ? 'text-white' : todayDate ? 'text-primary' : 'text-white'
+                            pastDate ? 'text-gray-600' : isSelected ? 'text-white' : todayDate ? 'text-primary' : 'text-white'
                           }`}>
                             {dateInfo.day}
                           </span>
                           <span className={`text-xs ${
-                            isSelected ? 'text-white/90' : 'text-gray-300'
+                            pastDate ? 'text-gray-600' : isSelected ? 'text-white/90' : 'text-gray-300'
                           }`}>
                             {dateInfo.month}
                           </span>
                         </div>
 
                         {/* Today Indicator */}
-                        {todayDate && !isSelected && (
+                        {todayDate && !isSelected && !pastDate && (
                           <div className='absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse'></div>
+                        )}
+
+                        {/* Past Date Indicator */}
+                        {pastDate && (
+                          <div className='absolute inset-0 flex items-center justify-center'>
+                            <div className='w-8 h-0.5 bg-gray-600 rotate-45'></div>
+                          </div>
                         )}
                       </button>
                     )
