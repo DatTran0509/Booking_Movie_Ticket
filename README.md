@@ -213,7 +213,7 @@ Booking_Movie_Ticket/
 
 - **Developer**: Dat Tran
 - **Email**: dat881070@gmail.com
-- **Project Link**: https://github.com/username/Booking_Movie_Ticket
+- **Project Link**: https://github.com/DatTran0509/Booking_Movie_Ticket
 
 ## Acknowledgments
 
