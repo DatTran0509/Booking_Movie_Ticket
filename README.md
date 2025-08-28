@@ -209,14 +209,10 @@ Booking_Movie_Ticket/
 
 
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Contact
 
 - **Developer**: Dat Tran
-- **Email**: your.email@example.com
+- **Email**: dat881070@gmail.com
 - **Project Link**: https://github.com/username/Booking_Movie_Ticket
 
 ## Acknowledgments
