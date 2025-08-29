@@ -1,5 +1,20 @@
 # Booking Movie Ticket System
 
+<div align="center">
+
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge&logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Stripe](https://img.shields.io/badge/Stripe-626CD9?style=for-the-badge&logo=stripe&logoColor=white)
+![Clerk](https://img.shields.io/badge/Clerk-6C47FF?style=for-the-badge&logo=clerk&logoColor=white)
+![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
+
+</div>
+
 A comprehensive movie ticket booking system that allows users to browse movies, select seats, and book tickets online.
 
 ## 🌐 Live Demo
@@ -21,9 +36,9 @@ A comprehensive movie ticket booking system that allows users to browse movies, 
 ### 🎭 User Interface
 
 #### Home Page
-<img src="./Images/Client/Home_1" alt="Home Page" width="800"/>
-<img src="./Images/Client/Home_Now_Showing" alt="Home now showing" width="800"/>
-<img src="./Images/Client/Home_Trailer" alt="Home trailers" width="800"/>
+<img src="./Images/Client/Home_1.png" alt="Home Page" width="800"/>
+<img src="./Images/Client/Home_Now_Showing.png" alt="Home now showing" width="800"/>
+<img src="./Images/Client/Home_Trailer.png" alt="Home trailers" width="800"/>
 
 *Browse featured movies and upcoming releases*
 
