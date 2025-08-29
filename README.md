@@ -2,7 +2,80 @@
 
 A comprehensive movie ticket booking system that allows users to browse movies, select seats, and book tickets online.
 
-## Features
+## 🌐 Live Demo
+
+<div align="center">
+  
+### 🎬 **Experience the Live Application**
+
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Visit_Website-success?style=for-the-badge&logo=vercel&logoColor=white)](https://booking-movie-ticket-client-eight.vercel.app/)
+
+---
+
+*Click the button above to explore the complete movie booking experience*
+
+</div>
+
+## 📸 Application Visualization
+
+### 🎭 User Interface
+
+#### Home Page
+<img src="./Images/Client/Home_1" alt="Home Page" width="800"/>
+<img src="./Images/Client/Home_Now_Showing" alt="Home now showing" width="800"/>
+<img src="./Images/Client/Home_Trailer" alt="Home trailers" width="800"/>
+
+*Browse featured movies and upcoming releases*
+
+#### Movie Details
+<img src="./Images/Client/Movies.png" alt="Movie Details" width="800"/>
+
+*View movie information, trailers, and available showtimes*
+
+#### Seat Selection
+<img src="./Images/Client/Booking_Seat.png" alt="Seat Selection" width="800"/>
+
+*Interactive seat map with real-time availability*
+
+#### Booking History
+<img src="./Images/Client/Client_Booking.png" alt="Bookings" width="800"/>
+
+*Client Booking*
+
+#### User Profile
+<img src="./Images/Client/User-Profile.png" alt="User Profile" width="800"/>
+
+*Manage user account and view booking history*
+
+### 🛠️ Admin Dashboard
+
+#### Admin Overview
+<img src="./Images/Admin/Dashboard_1.png" alt="Admin Dashboard 1" width="800"/>
+<img src="./Images/Admin/Dashboard_2.png" alt="Admin Dashboard 2" width="800"/>
+
+*Comprehensive dashboard with analytics and key metrics*
+
+#### Movie Management
+<img src="./Images/Admin/List_Show.png" alt="Movie Management" width="800"/>
+
+*Add, edit, and manage movie listings*
+
+#### Theater Management
+<img src="./Images/Admin/Theater_Setting.png" alt="Theater Management" width="800"/>
+
+*Configure theaters, screens, and seating arrangements*
+
+#### Booking Management
+<img src="./Images/Admin/Bookings.png" alt="Booking Management" width="800"/>
+
+*Monitor and manage all customer bookings*
+
+#### Control Panel
+<img src="./Images/Admin/Control_Panel.png" alt="Control Panel" width="800"/>
+
+*Add show automation*
+
+## ✨ Features
 
 - **User Authentication**: Registration, login, and profile management via Clerk
 - **Movie Browsing**: View current and upcoming movies with details
@@ -15,9 +88,14 @@ A comprehensive movie ticket booking system that allows users to browse movies, 
 - **Email Notifications**: Booking confirmations via Nodemailer
 - **Responsive Design**: Works on desktop and mobile devices
 
-## Technology Stack
+## 🛠️ Technology Stack
 
 ### Frontend
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+
 - **Framework**: React 19 with Vite
 - **Styling**: Tailwind CSS 
 - **Authentication**: Clerk React
@@ -29,6 +107,11 @@ A comprehensive movie ticket booking system that allows users to browse movies, 
 - **Notifications**: React Hot Toast
 
 ### Backend
+![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge&logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![Mongoose](https://img.shields.io/badge/Mongoose-880000?style=for-the-badge&logo=mongoose&logoColor=white)
+
 - **Runtime**: Node.js with Express
 - **Database**: MongoDB with Mongoose 
 - **Authentication**: Clerk Express
@@ -39,6 +122,19 @@ A comprehensive movie ticket booking system that allows users to browse movies, 
 - **Task Scheduling**: Node-cron 
 - **Webhooks**: Svix 
 - **CORS**: Enabled for cross-origin requests
+
+### Services & Integrations
+![Stripe](https://img.shields.io/badge/Stripe-626CD9?style=for-the-badge&logo=stripe&logoColor=white)
+![Clerk](https://img.shields.io/badge/Clerk-6C47FF?style=for-the-badge&logo=clerk&logoColor=white)
+![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
+
+### Development Tools
+![NPM](https://img.shields.io/badge/NPM-CB3837?style=for-the-badge&logo=npm&logoColor=white)
+![ESLint](https://img.shields.io/badge/ESLint-4B32C3?style=for-the-badge&logo=eslint&logoColor=white)
+![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
+![VS Code](https://img.shields.io/badge/VS_Code-007ACC?style=for-the-badge&logo=visual-studio-code&logoColor=white)
+
 ## Deployment
 
 ### Frontend (Vercel)
@@ -50,14 +146,13 @@ A comprehensive movie ticket booking system that allows users to browse movies, 
 - MongoDB Atlas for production database
 - Webhook endpoints configured for Stripe and Inngest
 
-
 ### Development Tools
 - **Package Manager**: npm
 - **Dev Server**: Vite (Frontend), Nodemon (Backend)
 - **Linting**: ESLint
 - **Environment**: dotenv for environment variables
 
-## Installation
+## 🚀 Installation
 
 ### Prerequisites
 - Node.js (v18 or higher)
@@ -117,7 +212,7 @@ A comprehensive movie ticket booking system that allows users to browse movies, 
    npm run dev
    ```
 
-## Usage
+## 📱 Usage
 
 ### For Users
 1. **Register/Login**: Create an account or login with Clerk authentication
@@ -133,7 +228,7 @@ A comprehensive movie ticket booking system that allows users to browse movies, 
 4. **Booking Overview**: View and manage all bookings with charts
 5. **User Management**: Handle user accounts and permissions
 
-## API Endpoints
+## 📡 API Endpoints
 
 ### Shows
 - `GET /api/show` - Get all shows
@@ -162,7 +257,7 @@ A comprehensive movie ticket booking system that allows users to browse movies, 
 - `POST /api/stripe/webhook` - Stripe payment webhooks
 - `POST /api/inngest` - Inngest background job webhooks
 
-## Project Structure
+## 📂 Project Structure
 
 ```
 Booking_Movie_Ticket/
@@ -189,7 +284,7 @@ Booking_Movie_Ticket/
 └── README.md             # Project documentation
 ```
 
-## Database Models
+## 🗄️ Database Models
 
 ### Show Model
 - Movie information, theater details, showtimes, and seat availability
@@ -200,22 +295,20 @@ Booking_Movie_Ticket/
 ### User Model (Managed by Clerk)
 - User authentication and profile data handled by Clerk
 
-## Background Jobs (Inngest)
+## ⚡ Background Jobs (Inngest)
 
 - **Email Notifications**: Send booking confirmations
 - **Seat Availability**: Update seat status
 - **Payment Processing**: Handle payment confirmations
 - **Data Cleanup**: Scheduled maintenance tasks
 
-
-
-## Contact
+## 📧 Contact
 
 - **Developer**: Dat Tran
 - **Email**: dat881070@gmail.com
 - **Project Link**: https://github.com/DatTran0509/Booking_Movie_Ticket
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 - Clerk for authentication services
 - Stripe for payment processing
