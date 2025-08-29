@@ -58,9 +58,9 @@ A comprehensive movie ticket booking system that allows users to browse movies, 
 *Client Booking*
 
 #### User Profile
-<img src="./Images/Client/User-Profile.png" alt="User Profile" width="800"/>
+<img src="./Images/Client/User_Profile.png" alt="User Profile" width="800"/>
 
-*Manage user account and view booking history*
+*Manage user account*
 
 ### 🛠️ Admin Dashboard
 
