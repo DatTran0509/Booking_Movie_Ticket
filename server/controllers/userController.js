@@ -31,15 +31,16 @@ export const updateFavorite = async (req, res) => {
 
         const userId = req.auth().userId;
         const user = await clerkClient.users.getUser(userId);
-        if(!user.privateMetadata.favorites) {
-            user.privateMetadata.favorites = [];
+        const privateMetadata = { ...(user.privateMetadata || {}) };
+        if(!privateMetadata.favorites) {
+            privateMetadata.favorites = [];
         }
-        if(!user.privateMetadata.favorites.includes(movieId)) {
-            user.privateMetadata.favorites.push(movieId);
+        if(!privateMetadata.favorites.includes(movieId)) {
+            privateMetadata.favorites.push(movieId);
         }else{
-            user.privateMetadata.favorites = user.privateMetadata.favorites.filter(item => item !== movieId)
+            privateMetadata.favorites = privateMetadata.favorites.filter(item => item !== movieId)
         }
-        await clerkClient.users.updateUserMetadata(userId, {privateMetadata: user.privateMetadata});
+        await clerkClient.users.updateUserMetadata(userId, {privateMetadata});
         res.json({ success: true, message: "Favorite movie added successfully" });
     } catch (error) {
         console.error(error);
@@ -50,7 +51,7 @@ export const updateFavorite = async (req, res) => {
 export const getFavorites = async(req, res) => {
     try {
         const user = await clerkClient.users.getUser(req.auth().userId)
-        const favorites = user.privateMetadata.favorites;
+        const favorites = user.privateMetadata.favorites || [];
 
         //Getting movies from database
         const movies = await Movie.find({_id: {$in: favorites}})

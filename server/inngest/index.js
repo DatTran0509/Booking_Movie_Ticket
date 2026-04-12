@@ -1,4 +1,5 @@
 import { Inngest } from "inngest";
+import { getPaymentHoldMinutes } from "../configs/env.js";
 import User from "../models/User.js";
 import Booking from "../models/Booking.js";
 import Show from "../models/Show.js";
@@ -53,8 +54,9 @@ const releaseSeatsAndDeleteBooking = inngest.createFunction(
     {id: 'release-seats-and-delete-booking'},
     {event: 'app/checkpayment'},
     async ({event, step}) => {
-        const tenMinutesLater = new Date(Date.now() + 10 * 60 * 1000);
-        await step.sleepUntil('wait-for-10-minutes',tenMinutesLater);
+        const paymentHoldMinutes = getPaymentHoldMinutes();
+        const releaseTime = new Date(Date.now() + paymentHoldMinutes * 60 * 1000);
+        await step.sleepUntil('wait-for-checkout-expiry', releaseTime);
 
         await step.run('check-payment-status', async () => {
             const bookingId = event.data.bookingId;

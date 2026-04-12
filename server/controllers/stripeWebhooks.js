@@ -23,6 +23,11 @@ export const stripeWebhooks = async (request, response) => {
                     });
 
                     const session = sessionList.data[0];
+                    if (!session?.metadata?.bookingId) {
+                        console.error('Stripe session metadata is missing bookingId');
+                        break;
+                    }
+
                     const {bookingId} = session.metadata;
                     console.log(`PaymentIntent was successful for booking ${bookingId}`);
 
