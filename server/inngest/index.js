@@ -54,7 +54,7 @@ const releaseSeatsAndDeleteBooking = inngest.createFunction(
     {id: 'release-seats-and-delete-booking'},
     {event: 'app/checkpayment'},
     async ({event, step}) => {
-        const paymentHoldMinutes = getPaymentHoldMinutes();
+        const paymentHoldMinutes = Math.max(getPaymentHoldMinutes(), 30);
         const releaseTime = new Date(Date.now() + paymentHoldMinutes * 60 * 1000);
         await step.sleepUntil('wait-for-checkout-expiry', releaseTime);
 

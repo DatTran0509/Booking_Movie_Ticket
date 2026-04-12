@@ -25,7 +25,15 @@ export const createBooking = async (req, res) => {
         const { userId } = req.auth();
         const { showId, selectedSeats } = req.body;
         const paymentHoldMinutes = getPaymentHoldMinutes();
-        const clientUrl = process.env.CLIENT_URL.replace(/\/+$/, '');
+        const checkoutExpiryMinutes = Math.max(paymentHoldMinutes, 30);
+        const clientUrl = (process.env.CLIENT_URL || req.headers.origin || '').replace(/\/+$/, '');
+
+        if (!clientUrl) {
+            return res.status(500).json({
+                success: false,
+                error: "Missing CLIENT_URL configuration",
+            });
+        }
 
         if (!showId) {
             return res.status(400).json({ success: false, message: "Show is required" });
@@ -93,7 +101,7 @@ export const createBooking = async (req, res) => {
             metadata: {
                 bookingId: bookingRecord._id.toString(),
             },
-            expires_at: Math.floor(Date.now() / 1000) + (paymentHoldMinutes * 60),
+            expires_at: Math.floor(Date.now() / 1000) + (checkoutExpiryMinutes * 60),
         });
 
         bookingRecord.paymentLink = session.url;
