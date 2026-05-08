@@ -177,7 +177,7 @@ Resources:
             aws ssm get-parameter --name "$SSM_ENV_PARAM_NAME" --with-decryption --region "$REGION" --query "Parameter.Value" --output text > "$APP_DIR/.env"
             chmod 600 "$APP_DIR/.env"
 
-            cd "$APP_DIR"
+            cd "$APP_DIR" 
             docker compose --project-name "booking-movie-ticket" up -d --build --remove-orphans
 
   # Auto Scaling Group
