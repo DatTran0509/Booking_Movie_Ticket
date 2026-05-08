@@ -195,7 +195,7 @@ Resources:
       TargetGroupARNs:
         - !Ref TargetGroup
       HealthCheckType: ELB
-      HealthCheckGracePeriod: 600
+      HealthCheckGracePeriod: 600 
 
 Outputs:
   LoadBalancerDNS:
