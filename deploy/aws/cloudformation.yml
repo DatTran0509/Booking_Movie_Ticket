@@ -114,6 +114,20 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
 
+  # ALB Listener (HTTPS) - Only created if CertificateArn is provided
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificate
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
   # Launch Template for Auto Scaling Group
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
