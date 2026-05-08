@@ -17,6 +17,29 @@ Conditions:
   HasCertificate: !Not [!Equals [!Ref CertificateArn, '']]
 
 Resources:
+  CloudflarePrefixList:
+    Type: AWS::EC2::PrefixList
+    Properties:
+      PrefixListName: Cloudflare-IPv4
+      AddressFamily: IPv4
+      MaxEntries: 20
+      Entries:
+        - Cidr: 173.245.48.0/20
+        - Cidr: 103.21.244.0/22
+        - Cidr: 103.22.200.0/22
+        - Cidr: 103.31.4.0/22
+        - Cidr: 141.101.64.0/18
+        - Cidr: 108.162.192.0/18
+        - Cidr: 190.93.240.0/20
+        - Cidr: 188.114.96.0/20
+        - Cidr: 197.234.240.0/22
+        - Cidr: 198.41.128.0/17
+        - Cidr: 162.158.0.0/15
+        - Cidr: 104.16.0.0/13
+        - Cidr: 104.24.0.0/14
+        - Cidr: 172.64.0.0/13
+        - Cidr: 131.0.72.0/22
+
   # IAM Role for EC2 instances to read from SSM Parameter Store
   EC2Role:
     Type: AWS::IAM::Role
@@ -57,27 +80,23 @@ Resources:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: 0.0.0.0/0
+          SourcePrefixListId: !GetAtt CloudflarePrefixList.PrefixListId
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
-          CidrIp: 0.0.0.0/0
+          SourcePrefixListId: !GetAtt CloudflarePrefixList.PrefixListId
 
-  # Security Group for EC2 Instances (Access ONLY from ALB and SSH)
+  # Security Group for EC2 Instances (Access ONLY from ALB, SSH via SSM)
   EC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow HTTP from ALB and SSH from anywhere
+      GroupDescription: Allow HTTP from ALB (SSH managed via SSM)
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           SourceSecurityGroupId: !GetAtt ALBSecurityGroup.GroupId
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
 
   # Application Load Balancer
   ApplicationLoadBalancer:
@@ -111,8 +130,18 @@ Resources:
       Port: 80
       Protocol: HTTP
       DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref TargetGroup
+        !If 
+          - HasCertificate
+          - - Type: redirect
+              RedirectConfig:
+                Protocol: HTTPS
+                Port: '443'
+                Host: '#{host}'
+                Path: '/#{path}'
+                Query: '#{query}'
+                StatusCode: HTTP_301
+          - - Type: forward
+              TargetGroupArn: !Ref TargetGroup
 
   # ALB Listener (HTTPS) - Only created if CertificateArn is provided
   HTTPSListener:
