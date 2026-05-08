@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cloud-Native Architecture for Booking Movie Ticket: ALB + ASG + EC2'
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Select your Default VPC
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Select at least TWO public subnets in your Default VPC
+  CertificateArn:
+    Type: String
+    Description: 'Optional: The ARN of your AWS ACM Certificate for HTTPS. If left blank, ALB will only listen on HTTP (Port 80) until you add an HTTPS listener manually.'
+    Default: ''
+
+Conditions:
+  HasCertificate: !Not [!Equals [!Ref CertificateArn, '']]
+
+Resources:
+  # IAM Role for EC2 instances to read from SSM Parameter Store
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: SSMParameterAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/booking-movie-ticket/*'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2Role
+
+  # Security Group for Load Balancer (Public Access)
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP and HTTPS inbound to ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  # Security Group for EC2 Instances (Access ONLY from ALB and SSH)
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP from ALB and SSH from anywhere
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !GetAtt ALBSecurityGroup.GroupId
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: booking-movie-alb
+      Subnets: !Ref SubnetIds
+      SecurityGroups:
+        - !GetAtt ALBSecurityGroup.GroupId
+      Scheme: internet-facing
+
+  # Target Group for ALB to forward to EC2
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: booking-movie-tg
+      VpcId: !Ref VpcId
+      Port: 80
+      Protocol: HTTP
+      HealthCheckPath: /healthz
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+
+  # ALB Listener (HTTP)
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # Launch Template for Auto Scaling Group
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: booking-movie-lt
+      LaunchTemplateData:
+        ImageId: resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64
+        InstanceType: t2.micro
+        IamInstanceProfile:
+          Arn: !GetAtt EC2InstanceProfile.Arn
+        SecurityGroupIds:
+          - !GetAtt EC2SecurityGroup.GroupId
+        # UserData is Base64 encoded. In production, paste your bash script contents here.
+        # This executes the deploy/aws/user-data.sh script.
+        UserData: 
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euo pipefail
+            APP_ROOT="/opt/booking-movie-ticket"
+            APP_DIR="$APP_ROOT/app"
+            BRANCH="main"
+            REGION="${AWS::Region}"
+            SSM_ENV_PARAM_NAME="/booking-movie-ticket/prod/env"
+
+            yum update -y
+            yum install -y docker git jq
+            yum install -y docker-compose-plugin || true
+            systemctl enable docker
+            systemctl start docker
+            usermod -a -G docker ec2-user || true
+
+            mkdir -p "$APP_ROOT/shared"
+            chown -R ec2-user:ec2-user "$APP_ROOT"
+
+            echo "Fetching secrets from AWS SSM..."
+            aws ssm get-parameter --name "$SSM_ENV_PARAM_NAME" --with-decryption --region "$REGION" --query "Parameter.Value" --output text > "$APP_ROOT/shared/.env.ec2"
+            chmod 600 "$APP_ROOT/shared/.env.ec2"
+
+            if [ ! -d "$APP_DIR/.git" ]; then
+              git clone --branch "$BRANCH" --single-branch "https://github.com/DatTran0509/Booking_Movie_Ticket.git" "$APP_DIR"
+            else
+              git -C "$APP_DIR" fetch origin
+              git -C "$APP_DIR" checkout "$BRANCH"
+              git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
+            fi
+
+            cd "$APP_DIR"
+            docker compose --project-name "booking-movie-ticket" --env-file "$APP_ROOT/shared/.env.ec2" -f "docker-compose.ec2.yml" up -d --build --remove-orphans
+
+  # Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: booking-movie-asg
+      VPCZoneIdentifier: !Ref SubnetIds
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: '1'
+      MaxSize: '3'
+      DesiredCapacity: '1'
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+
+Outputs:
+  LoadBalancerDNS:
+    Description: DNS Name of the Load Balancer
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
