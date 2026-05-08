@@ -13,10 +13,14 @@ SSM_ENV_PARAM_NAME="/booking-movie-ticket/prod/env"
 # 1. Update and install dependencies
 yum update -y
 yum install -y docker git jq
-yum install -y docker-compose-plugin || true
 systemctl enable docker
 systemctl start docker
 usermod -a -G docker ec2-user || true
+
+# Install Docker Compose v2 system-wide
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -SL "https://github.com/docker/compose/releases/download/v2.26.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 # 2. Setup Directories
 mkdir -p "$APP_ROOT/shared"
