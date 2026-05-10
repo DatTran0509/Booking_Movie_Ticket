@@ -50,6 +50,8 @@ chmod 600 "$APP_DIR/.env"
 # 5. Start Application via Docker Compose
 cd "$APP_DIR"
 
+export AWS_REGION="$REGION"
+
 docker compose \
   --project-name "booking-movie-ticket" \
   up -d --build --remove-orphans

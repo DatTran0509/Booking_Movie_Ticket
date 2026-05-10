@@ -35,10 +35,11 @@ services:
     deploy:
       replicas: 2
     logging:
-      driver: "json-file"
+      driver: "awslogs"
       options:
-        max-size: "10m"
-        max-file: "3"
+        awslogs-region: "${AWS_REGION:-ap-southeast-1}"
+        awslogs-group: "/booking-movie-ticket/docker"
+        awslogs-create-group: "true"
 
   client:
     build:
@@ -55,7 +56,8 @@ services:
       - "80:80"
     restart: unless-stopped
     logging:
-      driver: "json-file"
+      driver: "awslogs"
       options:
-        max-size: "10m"
-        max-file: "3"
+        awslogs-region: "${AWS_REGION:-ap-southeast-1}"
+        awslogs-group: "/booking-movie-ticket/docker"
+        awslogs-create-group: "true"
