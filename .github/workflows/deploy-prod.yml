@@ -24,6 +24,22 @@ jobs:
           role-to-assume: arn:aws:iam::919649535738:role/booking-movie-ticket-github-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Cancel any in-progress Instance Refresh
+        shell: bash
+        run: |
+          EXISTING=$(aws autoscaling describe-instance-refreshes \
+            --auto-scaling-group-name "booking-movie-asg" \
+            --query "InstanceRefreshes[?Status=='InProgress'].InstanceRefreshId" \
+            --output text)
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "None" ]; then
+            echo "Found in-progress refresh: $EXISTING. Cancelling..."
+            aws autoscaling cancel-instance-refresh --auto-scaling-group-name "booking-movie-asg"
+            echo "Waiting for cancellation to complete..."
+            sleep 30
+          else
+            echo "No in-progress refresh found. Proceeding."
+          fi
+
       - name: Deploy via ASG Instance Refresh
         shell: bash
         run: |
