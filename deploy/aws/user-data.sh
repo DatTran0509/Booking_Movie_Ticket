@@ -12,10 +12,41 @@ SSM_ENV_PARAM_NAME="/booking-movie-ticket/prod/env"
 
 # 1. Update and install dependencies
 yum update -y
-yum install -y docker git jq
+yum install -y docker git jq amazon-cloudwatch-agent
 systemctl enable docker
 systemctl start docker
 usermod -a -G docker ec2-user || true
+
+# 2. Configure and start CloudWatch Agent to ship Docker logs
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'EOF'
+{
+  "agent": {
+    "run_as_user": "root"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/lib/docker/containers/**/*-json.log",
+            "log_group_name": "/booking-movie-ticket/docker",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC",
+            "multi_line_start_pattern": "^\\{",
+            "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+  -s
 
 # Install Docker Compose v2 system-wide
 mkdir -p /usr/local/lib/docker/cli-plugins

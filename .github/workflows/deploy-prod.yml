@@ -16,12 +16,14 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::919649535738:role/booking-movie-ticket-github-deploy-role
           aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 7200  # 2 hours to prevent ExpiredToken during long refreshes
 
       - name: Deploy via ASG Instance Refresh
         shell: bash
@@ -34,7 +36,9 @@ jobs:
             --output text)
             
           echo "Instance Refresh Started: $REFRESH_ID"
-          echo "Monitoring refresh status..."
+          echo "Monitoring refresh status (timeout: 80 minutes)..."
+          
+          DEADLINE=$(( $(date +%s) + 4800 ))  # 80-minute timeout
           
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
@@ -51,5 +55,12 @@ jobs:
               echo "Deployment Failed or Cancelled!"
               exit 1
             fi
+
+            if [ $(date +%s) -ge $DEADLINE ]; then
+              echo "ERROR: Timed out after 80 minutes waiting for instance refresh."
+              aws autoscaling cancel-instance-refresh --auto-scaling-group-name "booking-movie-asg" || true
+              exit 1
+            fi
+
             sleep 30
           done
