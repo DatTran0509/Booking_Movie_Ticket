@@ -121,6 +121,7 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: booking-movie-ticket/server
+      EmptyOnDelete: true
       LifecyclePolicy:
         LifecyclePolicyText: |
           {"rules":[{"rulePriority":1,"description":"Keep last 5 images",
@@ -131,6 +132,7 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: booking-movie-ticket/client
+      EmptyOnDelete: true
       LifecyclePolicy:
         LifecyclePolicyText: |
           {"rules":[{"rulePriority":1,"description":"Keep last 5 images",
