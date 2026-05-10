@@ -16,14 +16,13 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::919649535738:role/booking-movie-ticket-github-deploy-role
           aws-region: ${{ env.AWS_REGION }}
-          role-duration-seconds: 7200  # 2 hours to prevent ExpiredToken during long refreshes
 
       - name: Deploy via ASG Instance Refresh
         shell: bash
