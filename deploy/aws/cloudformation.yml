@@ -40,6 +40,27 @@ Resources:
         - Cidr: 172.64.0.0/13
         - Cidr: 131.0.72.0/22
 
+  # ECR Repositories for pre-built Docker images
+  ServerECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: booking-movie-ticket/server
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"Keep last 5 images",
+          "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},
+          "action":{"type":"expire"}}]}
+
+  ClientECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: booking-movie-ticket/client
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"Keep last 5 images",
+          "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},
+          "action":{"type":"expire"}}]}
+
   # IAM Role for EC2 instances to read from SSM Parameter Store
   EC2Role:
     Type: AWS::IAM::Role
@@ -54,6 +75,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
         - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
       Policies:
         - PolicyName: SSMParameterAccess
           PolicyDocument:
@@ -170,8 +192,7 @@ Resources:
           Arn: !GetAtt EC2InstanceProfile.Arn
         SecurityGroupIds:
           - !GetAtt EC2SecurityGroup.GroupId
-        # UserData is Base64 encoded. In production, paste your bash script contents here.
-        # This executes the deploy/aws/user-data.sh script.
+        # UserData: EC2 pulls pre-built images from ECR — no build step needed.
         UserData: 
           Fn::Base64: !Sub |
             #!/bin/bash
@@ -180,6 +201,8 @@ Resources:
             APP_DIR="$APP_ROOT/app"
             BRANCH="main"
             REGION="${AWS::Region}"
+            ACCOUNT_ID="${AWS::AccountId}"
+            ECR_REGISTRY="${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"
             SSM_ENV_PARAM_NAME="/booking-movie-ticket/prod/env"
 
             # 1. Update and install dependencies
@@ -189,7 +212,7 @@ Resources:
             systemctl start docker
             usermod -a -G docker ec2-user || true
 
-            # 2. Configure and start CloudWatch Agent to ship Docker logs
+            # 2. Configure and start CloudWatch Agent
             cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF'
             {
               "agent": { "run_as_user": "root" },
@@ -221,9 +244,9 @@ Resources:
             mkdir -p "$APP_ROOT/shared"
             chown -R ec2-user:ec2-user "$APP_ROOT"
 
-            # 5. Clone / Update Repository
+            # 5. Pull docker-compose.yml from repo (only config file, no build needed)
             if [ ! -d "$APP_DIR/.git" ]; then
-              git clone --branch "$BRANCH" --single-branch "https://github.com/DatTran0509/Booking_Movie_Ticket.git" "$APP_DIR"
+              git clone --branch "$BRANCH" --single-branch --depth 1 "https://github.com/DatTran0509/Booking_Movie_Ticket.git" "$APP_DIR"
             else
               git -C "$APP_DIR" fetch origin
               git -C "$APP_DIR" checkout "$BRANCH"
@@ -233,12 +256,19 @@ Resources:
             # 6. Fetch secrets from AWS SSM Parameter Store
             echo "Fetching secrets from AWS SSM..."
             aws ssm get-parameter --name "$SSM_ENV_PARAM_NAME" --with-decryption --region "$REGION" --query "Parameter.Value" --output text > "$APP_DIR/.env"
+            # Append ECR registry so docker-compose can reference images
+            echo "" >> "$APP_DIR/.env"
+            echo "ECR_REGISTRY=$ECR_REGISTRY" >> "$APP_DIR/.env"
             chmod 600 "$APP_DIR/.env"
 
-            # 7. Start Application
-            cd "$APP_DIR"
+            # 7. Login to ECR and pull pre-built images, then start
             export AWS_REGION="$REGION"
-            docker compose --project-name "booking-movie-ticket" up -d --build --remove-orphans
+            aws ecr get-login-password --region "$REGION" | \
+              docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+            cd "$APP_DIR"
+            docker compose pull
+            docker compose --project-name "booking-movie-ticket" up -d --remove-orphans
             echo "User Data Bootstrap completed successfully."
 
   # Auto Scaling Group
@@ -256,7 +286,7 @@ Resources:
       TargetGroupARNs:
         - !Ref TargetGroup
       HealthCheckType: ELB
-      HealthCheckGracePeriod: 600 
+      HealthCheckGracePeriod: 180
 
   # Auto Scaling Policy (Scale out/in to maintain 70% CPU)
   CPUScalingPolicy:
