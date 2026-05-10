@@ -12,11 +12,87 @@ Parameters:
     Type: String
     Description: 'Optional: The ARN of your AWS ACM Certificate for HTTPS. If left blank, ALB will only listen on HTTP (Port 80) until you add an HTTPS listener manually.'
     Default: ''
+  GitHubRepo:
+    Type: String
+    Description: 'GitHub repository in the format owner/repo (e.g. DatTran0509/Booking_Movie_Ticket)'
+    Default: 'DatTran0509/Booking_Movie_Ticket'
+  CreateGitHubOIDCProvider:
+    Type: String
+    Description: 'Set to true only on first deploy if the GitHub OIDC provider does not yet exist in this AWS account.'
+    Default: 'false'
+    AllowedValues: ['true', 'false']
 
 Conditions:
   HasCertificate: !Not [!Equals [!Ref CertificateArn, '']]
+  ShouldCreateOIDCProvider: !Equals [!Ref CreateGitHubOIDCProvider, 'true']
 
 Resources:
+  # GitHub Actions OIDC Provider (only created if CreateGitHubOIDCProvider=true)
+  # On subsequent updates, set CreateGitHubOIDCProvider=false (default) to skip.
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  # IAM Role for GitHub Actions CI/CD Pipeline
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: booking-movie-ticket-github-deploy-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
+              StringLike:
+                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubRepo}:*'
+      Policies:
+        - PolicyName: GitHubActionsDeployPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # ASG Instance Refresh
+              - Effect: Allow
+                Action:
+                  - autoscaling:StartInstanceRefresh
+                  - autoscaling:CancelInstanceRefresh
+                  - autoscaling:DescribeInstanceRefreshes
+                Resource: '*'
+              # ECR Authentication
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: '*'
+              # ECR Push to our repositories
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:PutImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                Resource:
+                  - !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/booking-movie-ticket/*'
+              # SSM Read for build-time env vars
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/booking-movie-ticket/prod/env'
+
   CloudflarePrefixList:
     Type: AWS::EC2::PrefixList
     Properties:

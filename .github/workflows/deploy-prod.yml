@@ -11,21 +11,77 @@ permissions:
 
 env:
   AWS_REGION: ap-southeast-1
-  DEPLOY_BRANCH: main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::919649535738:role/booking-movie-ticket-github-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Fetch build-time env vars from SSM
+        id: fetch-env
+        run: |
+          # Fetch the full .env content from SSM
+          ENV_CONTENT=$(aws ssm get-parameter \
+            --name "/booking-movie-ticket/prod/env" \
+            --with-decryption \
+            --query "Parameter.Value" \
+            --output text)
+
+          # Extract VITE_ variables for client build args
+          VITE_BASE_URL=$(echo "$ENV_CONTENT" | grep '^VITE_BASE_URL=' | cut -d'=' -f2- || echo "")
+          VITE_CLERK_PUBLISHABLE_KEY=$(echo "$ENV_CONTENT" | grep '^VITE_CLERK_PUBLISHABLE_KEY=' | cut -d'=' -f2-)
+          VITE_TMDB_IMAGE_BASE_URL=$(echo "$ENV_CONTENT" | grep '^VITE_TMDB_IMAGE_BASE_URL=' | cut -d'=' -f2-)
+          VITE_CURRENCY=$(echo "$ENV_CONTENT" | grep '^VITE_CURRENCY=' | cut -d'=' -f2-)
+
+          echo "VITE_BASE_URL=$VITE_BASE_URL" >> $GITHUB_OUTPUT
+          echo "VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY" >> $GITHUB_OUTPUT
+          echo "VITE_TMDB_IMAGE_BASE_URL=$VITE_TMDB_IMAGE_BASE_URL" >> $GITHUB_OUTPUT
+          echo "VITE_CURRENCY=$VITE_CURRENCY" >> $GITHUB_OUTPUT
+
+      - name: Build & Push Server image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/booking-movie-ticket/server:$IMAGE_TAG \
+            -t $ECR_REGISTRY/booking-movie-ticket/server:latest \
+            ./server
+          docker push $ECR_REGISTRY/booking-movie-ticket/server:$IMAGE_TAG
+          docker push $ECR_REGISTRY/booking-movie-ticket/server:latest
+          echo "Server image pushed: $ECR_REGISTRY/booking-movie-ticket/server:$IMAGE_TAG"
+
+      - name: Build & Push Client image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg VITE_BASE_URL="${{ steps.fetch-env.outputs.VITE_BASE_URL }}" \
+            --build-arg VITE_CLERK_PUBLISHABLE_KEY="${{ steps.fetch-env.outputs.VITE_CLERK_PUBLISHABLE_KEY }}" \
+            --build-arg VITE_TMDB_IMAGE_BASE_URL="${{ steps.fetch-env.outputs.VITE_TMDB_IMAGE_BASE_URL }}" \
+            --build-arg VITE_CURRENCY="${{ steps.fetch-env.outputs.VITE_CURRENCY }}" \
+            -t $ECR_REGISTRY/booking-movie-ticket/client:$IMAGE_TAG \
+            -t $ECR_REGISTRY/booking-movie-ticket/client:latest \
+            ./client
+          docker push $ECR_REGISTRY/booking-movie-ticket/client:$IMAGE_TAG
+          docker push $ECR_REGISTRY/booking-movie-ticket/client:latest
+          echo "Client image pushed: $ECR_REGISTRY/booking-movie-ticket/client:$IMAGE_TAG"
+
       - name: Cancel any in-progress Instance Refresh
-        shell: bash
         run: |
           EXISTING=$(aws autoscaling describe-instance-refreshes \
             --auto-scaling-group-name "booking-movie-asg" \
@@ -34,14 +90,12 @@ jobs:
           if [ -n "$EXISTING" ] && [ "$EXISTING" != "None" ]; then
             echo "Found in-progress refresh: $EXISTING. Cancelling..."
             aws autoscaling cancel-instance-refresh --auto-scaling-group-name "booking-movie-asg"
-            echo "Waiting for cancellation to complete..."
             sleep 30
           else
             echo "No in-progress refresh found. Proceeding."
           fi
 
       - name: Deploy via ASG Instance Refresh
-        shell: bash
         run: |
           echo "Starting ASG Instance Refresh for booking-movie-asg..."
           REFRESH_ID=$(aws autoscaling start-instance-refresh \
@@ -49,19 +103,17 @@ jobs:
             --preferences '{"MinHealthyPercentage": 100}' \
             --query "InstanceRefreshId" \
             --output text)
-            
+
           echo "Instance Refresh Started: $REFRESH_ID"
-          echo "Monitoring refresh status (timeout: 80 minutes)..."
-          
-          DEADLINE=$(( $(date +%s) + 4800 ))  # 80-minute timeout
-          
+          DEADLINE=$(( $(date +%s) + 1500 ))  # 25-minute timeout
+
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
               --auto-scaling-group-name "booking-movie-asg" \
               --instance-refresh-ids "$REFRESH_ID" \
               --query "InstanceRefreshes[0].Status" \
               --output text)
-            
+
             echo "Current status: $STATUS"
             if [ "$STATUS" = "Successful" ]; then
               echo "Deployment Successful!"
@@ -72,7 +124,7 @@ jobs:
             fi
 
             if [ $(date +%s) -ge $DEADLINE ]; then
-              echo "ERROR: Timed out after 80 minutes waiting for instance refresh."
+              echo "ERROR: Timed out after 25 minutes."
               aws autoscaling cancel-instance-refresh --auto-scaling-group-name "booking-movie-asg" || true
               exit 1
             fi
