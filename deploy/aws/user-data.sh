@@ -53,7 +53,7 @@ mkdir -p /usr/local/lib/docker/cli-plugins
 curl -SL "https://github.com/docker/compose/releases/download/v2.26.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-# 2. Setup Directories
+# 3. Setup Directories
 mkdir -p "$APP_ROOT/shared"
 chown -R ec2-user:ec2-user "$APP_ROOT"
 
