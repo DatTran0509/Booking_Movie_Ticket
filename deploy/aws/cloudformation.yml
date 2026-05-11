@@ -8,6 +8,15 @@ Parameters:
   SubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
     Description: Select at least TWO public subnets in your Default VPC
+  InstanceType:
+    Type: String
+    Description: 'EC2 instance type (t3.micro is Free Tier eligible)'
+    Default: 't3.micro'
+    AllowedValues:
+      - t2.micro
+      - t3.micro
+      - t3.small
+      - t3.medium
   CertificateArn:
     Type: String
     Description: 'Optional: The ARN of your AWS ACM Certificate for HTTPS. If left blank, ALB will only listen on HTTP (Port 80) until you add an HTTPS listener manually.'
@@ -124,9 +133,20 @@ Resources:
       EmptyOnDelete: true
       LifecyclePolicy:
         LifecyclePolicyText: |
-          {"rules":[{"rulePriority":1,"description":"Keep last 5 images",
-          "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},
-          "action":{"type":"expire"}}]}
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
 
   ClientECRRepository:
     Type: AWS::ECR::Repository
@@ -135,9 +155,20 @@ Resources:
       EmptyOnDelete: true
       LifecyclePolicy:
         LifecyclePolicyText: |
-          {"rules":[{"rulePriority":1,"description":"Keep last 5 images",
-          "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},
-          "action":{"type":"expire"}}]}
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
 
   # IAM Role for EC2 instances to read from SSM Parameter Store
   EC2Role:
@@ -265,7 +296,7 @@ Resources:
       LaunchTemplateName: booking-movie-lt
       LaunchTemplateData:
         ImageId: resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64
-        InstanceType: t2.micro
+        InstanceType: !Ref InstanceType
         IamInstanceProfile:
           Arn: !GetAtt EC2InstanceProfile.Arn
         SecurityGroupIds:
@@ -275,22 +306,23 @@ Resources:
           Fn::Base64: !Sub |
             #!/bin/bash
             set -euo pipefail
+            exec > >(tee /var/log/user-data.log) 2>&1
+
             APP_ROOT="/opt/booking-movie-ticket"
             APP_DIR="$APP_ROOT/app"
             BRANCH="main"
             REGION="${AWS::Region}"
-            ACCOUNT_ID="${AWS::AccountId}"
             ECR_REGISTRY="${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com"
             SSM_ENV_PARAM_NAME="/booking-movie-ticket/prod/env"
 
             # 1. Update and install dependencies
             yum update -y
-            yum install -y docker git jq amazon-cloudwatch-agent
+            yum install -y docker git amazon-cloudwatch-agent
             systemctl enable docker
             systemctl start docker
             usermod -a -G docker ec2-user || true
 
-            # 2. Configure and start CloudWatch Agent
+            # 2. Configure and start CloudWatch Agent to ship Docker logs
             cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF'
             {
               "agent": { "run_as_user": "root" },
@@ -302,6 +334,7 @@ Resources:
                       "log_group_name": "/booking-movie-ticket/docker",
                       "log_stream_name": "{instance_id}",
                       "timezone": "UTC",
+                      "multi_line_start_pattern": "^\\{",
                       "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ"
                     }]
                   }
@@ -335,8 +368,7 @@ Resources:
             echo "Fetching secrets from AWS SSM..."
             aws ssm get-parameter --name "$SSM_ENV_PARAM_NAME" --with-decryption --region "$REGION" --query "Parameter.Value" --output text > "$APP_DIR/.env"
             # Append ECR registry so docker-compose can reference images
-            echo "" >> "$APP_DIR/.env"
-            echo "ECR_REGISTRY=$ECR_REGISTRY" >> "$APP_DIR/.env"
+            printf '\nECR_REGISTRY=%s\n' "$ECR_REGISTRY" >> "$APP_DIR/.env"
             chmod 600 "$APP_DIR/.env"
 
             # 7. Login to ECR and pull pre-built images, then start
@@ -352,6 +384,12 @@ Resources:
   # Auto Scaling Group
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: PT5M
+        WaitOnResourceSignals: false
     Properties:
       AutoScalingGroupName: booking-movie-asg
       VPCZoneIdentifier: !Ref SubnetIds
@@ -364,7 +402,7 @@ Resources:
       TargetGroupARNs:
         - !Ref TargetGroup
       HealthCheckType: ELB
-      HealthCheckGracePeriod: 180
+      HealthCheckGracePeriod: 300
 
   # Auto Scaling Policy (Scale out/in to maintain 70% CPU)
   CPUScalingPolicy:

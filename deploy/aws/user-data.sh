@@ -1,20 +1,24 @@
 #!/bin/bash
 set -euo pipefail
+exec > >(tee /var/log/user-data.log) 2>&1
 
-# This script is executed by AWS EC2 instances on startup (Launch Template User Data).
-# It pulls pre-built Docker images from ECR and starts the application.
+# ==============================================================================
+# REFERENCE SCRIPT — for local testing / debugging only.
+# The actual User Data is defined inline in cloudformation.yml (LaunchTemplate).
+# Keep this file in sync with the CloudFormation UserData block.
+# ==============================================================================
 
 APP_ROOT="/opt/booking-movie-ticket"
 APP_DIR="$APP_ROOT/app"
 BRANCH="main"
-REGION="ap-southeast-1"
+REGION=$(curl -sf http://169.254.169.254/latest/meta-data/placement/region)
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 SSM_ENV_PARAM_NAME="/booking-movie-ticket/prod/env"
 
 # 1. Update and install dependencies
 yum update -y
-yum install -y docker git jq amazon-cloudwatch-agent
+yum install -y docker git amazon-cloudwatch-agent
 systemctl enable docker
 systemctl start docker
 usermod -a -G docker ec2-user || true
@@ -78,8 +82,7 @@ aws ssm get-parameter \
   --output text > "$APP_DIR/.env"
 
 # Append ECR registry for docker-compose image references
-echo "" >> "$APP_DIR/.env"
-echo "ECR_REGISTRY=$ECR_REGISTRY" >> "$APP_DIR/.env"
+printf '\nECR_REGISTRY=%s\n' "$ECR_REGISTRY" >> "$APP_DIR/.env"
 chmod 600 "$APP_DIR/.env"
 
 # 7. Login to ECR, pull pre-built images, and start application
