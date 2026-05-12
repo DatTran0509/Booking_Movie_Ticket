@@ -169,7 +169,7 @@ graph TB
 
 ---
 
-## Request Flow (chi tiết từng bước)
+## Request Flow 
 
 ```mermaid
 sequenceDiagram
